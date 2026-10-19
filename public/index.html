@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>EvoFlow</title>
+  <meta name="description" content="Le tue sessioni Claude Code in parallelo: chi ti aspetta adesso, e perché.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f5f5f2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="EvoFlow">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="app.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <!-- Login: shown when any /api call answers 401. -->
+  <main id="login" class="login" hidden>
+    <form id="login-form" class="login-card" novalidate>
+      <img src="icon.svg" alt="" width="56" height="56">
+      <h1>EvoFlow</h1>
+      <p class="login-sub">Chi ti aspetta adesso, e perché.</p>
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" enterkeyhint="go" required>
+      <p id="login-error" class="form-error" role="alert"></p>
+      <button id="login-submit" type="submit" class="btn btn-primary btn-block">Entra</button>
+    </form>
+  </main>
+
+  <div id="dashboard" hidden>
+    <header class="topbar">
+      <div class="wrap topbar-inner">
+        <div class="brand">
+          <img src="icon.svg" alt="" width="32" height="32">
+          <div class="brand-text">
+            <h1>EvoFlow</h1>
+            <p id="freshness" class="freshness"><span class="live-dot" aria-hidden="true"></span><span id="freshness-text">collegamento…</span></p>
+          </div>
+        </div>
+        <button id="lost-btn" type="button" class="btn btn-secondary btn-lost"></button>
+      </div>
+      <div class="wrap">
+        <p id="offline" class="offline" role="status"></p>
+      </div>
+    </header>
+
+    <main id="main" class="wrap">
+      <p id="loading" class="loading">Carico le sessioni…</p>
+
+      <section id="summary" class="summary" aria-labelledby="summary-title" hidden>
+        <h2 id="summary-title" class="sr-only">Riepilogo</h2>
+        <p id="summary-live" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+        <div id="calm" class="calm" hidden>
+          <p class="calm-title">Nessuno ti aspetta.</p>
+          <p id="calm-sub" class="calm-sub"></p>
+        </div>
+        <div id="chips" class="chips" role="group" aria-label="Filtra per stato"></div>
+      </section>
+
+      <section id="empty" class="empty" aria-labelledby="empty-title" hidden>
+        <h2 id="empty-title">Ancora nessuna sessione</h2>
+        <p>Qui compaiono le tue sessioni Claude Code appena arrivano i primi eventi: succede dopo aver installato gli hook sulle macchine e nelle sessioni cloud che vuoi seguire.</p>
+        <p>Le istruzioni sono nel repository, in <code>docs/SETUP.md</code>.</p>
+      </section>
+
+      <div id="board" class="board" hidden>
+        <div id="col-attention" class="col"></div>
+        <div id="col-rest" class="col"></div>
+      </div>
+    </main>
+
+    <footer class="footer wrap">
+      <button id="diary-btn" type="button" class="link-btn">Diario</button>
+      <span aria-hidden="true">·</span>
+      <button id="logout-btn" type="button" class="link-btn">Esci</button>
+    </footer>
+  </div>
+
+  <!-- "Mi sono perso": one tap to log the moment the user lost track. -->
+  <dialog id="lost-dialog" class="sheet" aria-labelledby="lost-title">
+    <form id="lost-form" class="sheet-body">
+      <h2 id="lost-title" tabindex="-1" autofocus>Mi sono perso</h2>
+      <p class="sheet-sub">Segno questo momento nel diario, insieme a quanti agenti ti aspettavano.</p>
+      <label for="lost-note">Cosa è successo? (facoltativo)</label>
+      <textarea id="lost-note" rows="3" maxlength="1000"></textarea>
+      <p id="lost-error" class="form-error" role="alert"></p>
+      <div class="sheet-actions">
+        <button type="button" class="link-btn" data-open-diary>Vedi il diario</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-ghost" data-close>Annulla</button>
+        <button id="lost-submit" type="submit" class="btn btn-primary">Annota</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="diary-dialog" class="sheet sheet-tall" aria-labelledby="diary-title">
+    <div class="sheet-body">
+      <div class="sheet-head">
+        <h2 id="diary-title" tabindex="-1" autofocus>Diario</h2>
+        <button type="button" class="btn btn-ghost" data-close>Chiudi</button>
+      </div>
+      <div id="diary-list" class="diary-list"></div>
+    </div>
+  </dialog>
+
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+</body>
+</html>

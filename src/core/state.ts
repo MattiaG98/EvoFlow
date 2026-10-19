@@ -28,8 +28,9 @@ export function deriveSession(row: SessionRow, now: number, cfg: StateConfig = D
 
   let base = fromSnapshot ? fromSnapshotFields(row) : fromHookFields(row);
 
-  const dismissed = row.dismissed_at != null && row.dismissed_at >= lastActivity;
-  if (dismissed && base.state !== 'working') {
+  // Archiving hides a session until it does something new; a session still working is never hidden.
+  const dismissed = row.dismissed_at != null && row.dismissed_at >= lastActivity && base.state !== 'working';
+  if (dismissed) {
     base = { state: 'done', reason: 'Archiviata da te', since: row.dismissed_at! };
   }
 

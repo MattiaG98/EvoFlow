@@ -83,6 +83,9 @@ test('archiving lasts until the session does something new', () => {
   const resumed = deriveSession(row({ ...base, last_event_at: NOW - 60_000, dismissed_at: NOW - 30 * 60_000 }), NOW);
   assert.equal(resumed.state, 'waiting');
   assert.equal(resumed.dismissed, false);
+  const working = deriveSession(row({ last_event: 'PreToolUse', last_event_at: NOW - H, dismissed_at: NOW }), NOW);
+  assert.equal(working.state, 'working');
+  assert.equal(working.dismissed, false, 'a working session is never shown as archived');
 });
 
 test('session links point to claude.ai only for cloud sessions', () => {

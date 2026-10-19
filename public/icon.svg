@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Three agents as lanes; the amber one is waiting for you. -->
+  <rect width="512" height="512" rx="112" fill="#17293c"/>
+  <g stroke-linecap="round" stroke-width="34" fill="none">
+    <path d="M214 160H384" stroke="#4d6a87"/>
+    <path d="M214 256H384" stroke="#eef2f6"/>
+    <path d="M214 352H340" stroke="#4d6a87"/>
+  </g>
+  <circle cx="142" cy="160" r="26" fill="#4d6a87"/>
+  <circle cx="142" cy="256" r="40" fill="#f2a43a"/>
+  <circle cx="142" cy="352" r="26" fill="#4d6a87"/>
+</svg>

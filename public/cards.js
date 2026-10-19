@@ -1,4 +1,5 @@
-// Builds one session card. Pure DOM construction: behaviour lives in app.js (delegated clicks on data-action).
+// Builds one session row of an inset grouped list. Pure DOM construction: behaviour lives in app.js
+// (delegated clicks on data-action). The row keeps the class `card` for scripts and tests.
 
 import { h, icon } from './dom.js';
 import {
@@ -7,16 +8,19 @@ import {
   agoText,
   contextPercent,
   device,
+  elapsedText,
   localizeReason,
   money,
   quietText,
-  sinceText,
 } from './format.js';
 
 const CONTEXT_WARN = 80;
 
 /** Stable, attribute-safe id fragment for a session key. */
 const domId = (key) => `s-${key.replace(/[^\w-]/g, '_')}`;
+
+/** The status light: decorative, the row's state label carries the meaning in text. */
+export const light = (state, extra = '') => h('span', { class: `light light-${state}${extra}`, 'aria-hidden': 'true' });
 
 /**
  * @param s  a DerivedSession from GET /api/sessions
@@ -31,113 +35,98 @@ export function buildCard(s, { now, expanded, pending }) {
   const attention = ATTENTION.has(s.state);
   const reason = s.reason ? localizeReason(s.reason) : '';
 
-  const card = h(
+  return h(
     'article',
     {
-      class: `card card-${s.state}${attention ? ' card-attention' : ''}${s.quiet ? ' card-quiet-warn' : ''}${expanded ? ' is-expanded' : ''}`,
+      class: `card card-${s.state}${attention ? ' is-attention' : ''}${expanded ? ' is-expanded' : ''}`,
       'data-key': s.key,
       'aria-labelledby': `${id}-title`,
     },
+    light(s.state, s.state === 'working' && !s.quiet ? ' is-pulsing' : ''),
     h(
       'div',
-      { class: 'card-head' },
+      { class: 'row-main' },
+      // Line 1: title + how long it has been in this state, like a sender and a time in Mail.
       h(
-        'span',
-        { class: 'badge' },
-        icon(s.state),
-        h('span', { class: 'badge-label' }, meta.label),
-        h('span', { class: 'badge-time', 'data-rel': 'since', 'data-t': s.since }, sinceText(now - s.since)),
+        'div',
+        { class: 'row-head' },
+        h(
+          'h3',
+          { class: 'card-title', id: `${id}-title` },
+          h(
+            'button',
+            { type: 'button', class: 'row-toggle', 'data-action': 'toggle', 'aria-expanded': String(expanded), 'aria-controls': `${id}-details` },
+            s.title,
+          ),
+        ),
+        h(
+          'span',
+          { class: 'row-time mono' },
+          h('span', { class: 'sr-only' }, `${meta.label}, in questo stato da `),
+          h('span', { 'data-rel': 'elapsed', 'data-t': s.since }, elapsedText(now - s.since)),
+        ),
+        icon('disclosure', 'row-chevron'),
       ),
-      h('span', { class: 'device' }, icon(dev.icon), dev.label),
+      // Line 2: why it is in this state; for a permission request, also what it wants to run.
+      reason && reason !== s.title ? h('p', { class: 'reason' }, reason) : null,
+      s.state === 'waiting' && s.activity && s.activity !== s.reason
+        ? h('p', { class: 'activity' }, h('span', { class: 'activity-label' }, 'Vuole eseguire'), h('code', {}, s.activity))
+        : null,
+      // Line 3: state, device, repository; the quick "Apri" capsule on the right.
+      h(
+        'div',
+        { class: 'row-foot' },
+        h(
+          'div',
+          { class: 'row-meta mono' },
+          h(
+            'p',
+            { class: 'meta-line' },
+            h('span', { class: 'state-label' }, meta.label),
+            h('span', { class: 'meta-device' }, icon(dev.icon), dev.label),
+          ),
+          repoLine(s),
+        ),
+        s.url
+          ? h(
+              'a',
+              { class: 'capsule', href: s.url, target: '_blank', rel: 'noopener' },
+              'Apri',
+              h('span', { class: 'sr-only' }, ` in Claude: ${s.title} (si apre in una nuova scheda)`),
+            )
+          : null,
+      ),
+      badges(s, now),
+      details(s, dev, { id, expanded, now, pending }),
     ),
-    h('h3', { class: 'card-title', id: `${id}-title` }, s.title),
-    reason && reason !== s.title ? h('p', { class: 'reason' }, reason) : null,
-    // For a permission request, what it wants to run is the actionable detail.
-    s.state === 'waiting' && s.activity && s.activity !== s.reason
-      ? h('p', { class: 'activity' }, h('span', { class: 'activity-label' }, 'Vuole eseguire'), h('span', { class: 'mono' }, s.activity))
-      : null,
-    s.quiet
-      ? h('p', { class: 'warn' }, icon('alert'), h('span', { 'data-rel': 'quiet', 'data-t': s.last_activity_at }, quietText(now - s.last_activity_at)))
-      : null,
-    repoLine(s),
-    statsRow(s),
-    actions(s, dev, { id, expanded, pending }),
-    details(s, dev, { id, expanded, now }),
   );
-  return card;
 }
 
 function repoLine(s) {
   if (!s.repo && !s.branch) return null;
   return h(
     'p',
-    { class: 'repo mono' },
+    { class: 'repo' },
     s.repo ? h('span', { class: 'repo-name', title: s.repo }, s.repo) : null,
     s.repo && s.branch ? h('span', { class: 'repo-sep', 'aria-hidden': 'true' }, '·') : null,
     s.branch ? h('span', { class: 'repo-branch', title: s.branch }, s.branch) : null,
   );
 }
 
-function statsRow(s) {
+/** Compact mono flags: only what deserves attention without opening the row. */
+function badges(s, now) {
   const items = [];
+  if (s.quiet) {
+    items.push(h('span', { class: 'flag flag-warn' }, icon('alert'), h('span', { 'data-rel': 'quiet', 'data-t': s.last_activity_at }, quietText(now - s.last_activity_at))));
+  }
   const pct = contextPercent(s.context_used, s.context_max);
-  if (pct != null) {
-    const high = pct >= CONTEXT_WARN;
-    const fill = h('span', { class: 'ctx-fill' });
-    fill.style.width = `${pct}%`;
-    items.push(
-      h(
-        'span',
-        { class: `ctx${high ? ' ctx-high' : ''}` },
-        high ? icon('alert') : null,
-        h('span', {}, `Contesto ${pct}%${high ? ', quasi pieno' : ''}`),
-        h('span', { class: 'ctx-bar', 'aria-hidden': 'true' }, fill),
-      ),
-    );
-  }
-  if (s.cost_usd != null) items.push(h('span', { class: 'cost' }, h('span', { class: 'sr-only' }, 'Costo '), money(s.cost_usd)));
-  if (s.unread) items.push(h('span', { class: 'tag tag-unread' }, 'Non letta'));
-  if (s.from_snapshot) items.push(h('span', { class: 'hint' }, icon('snapshot'), 'dato non in tempo reale'));
-  return items.length ? h('div', { class: 'stats' }, items) : null;
+  if (pct != null && pct >= CONTEXT_WARN) items.push(h('span', { class: 'flag flag-warn' }, icon('alert'), `Contesto ${pct}%, quasi pieno`));
+  if (s.unread) items.push(h('span', { class: 'flag' }, 'Non letta'));
+  if (s.from_snapshot) items.push(h('span', { class: 'flag' }, icon('snapshot'), 'dato non in tempo reale'));
+  return items.length ? h('div', { class: 'flags mono' }, items) : null;
 }
 
-function actions(s, dev, { id, expanded, pending }) {
-  // Strong "Apri" only where the user is expected to act; quieter on working/done cards.
-  const strong = s.state !== 'working' && s.state !== 'done';
-  const open = s.url
-    ? h(
-        'a',
-        { class: `btn ${strong ? 'btn-primary' : 'btn-secondary'}`, href: s.url, target: '_blank', rel: 'noopener' },
-        'Apri in Claude',
-        icon('external'),
-        h('span', { class: 'sr-only' }, '(si apre in una nuova scheda)'),
-      )
-    : h('span', { class: 'local-note' }, icon(dev.icon), s.host ? `Sessione locale su ${s.host}` : 'Sessione locale');
-
-  let archive = null;
-  if (s.dismissed) {
-    archive = h('button', { type: 'button', class: 'btn btn-secondary', 'data-action': 'restore', disabled: pending }, icon('restore'), pending ? 'Ripristino…' : 'Ripristina');
-  } else if (s.state !== 'working' && s.state !== 'done') {
-    archive = h('button', { type: 'button', class: 'btn btn-ghost', 'data-action': 'dismiss', disabled: pending }, icon('archive'), 'Archivia');
-  }
-
-  const toggle = h(
-    'button',
-    {
-      type: 'button',
-      class: 'btn btn-ghost btn-icon toggle',
-      'data-action': 'toggle',
-      'aria-expanded': String(expanded),
-      'aria-controls': `${id}-details`,
-      'aria-label': 'Dettagli',
-      title: 'Dettagli',
-    },
-    icon('chevron'),
-  );
-  return h('div', { class: 'actions' }, h('div', { class: 'actions-main' }, open, archive), toggle);
-}
-
-function details(s, dev, { id, expanded, now }) {
+function details(s, dev, { id, expanded, now, pending }) {
   const blocks = [];
   if (s.last_prompt) {
     blocks.push(h('div', { class: 'qa' }, h('p', { class: 'qa-label' }, 'Hai chiesto:'), h('p', { class: 'qa-text' }, s.last_prompt)));
@@ -156,19 +145,48 @@ function details(s, dev, { id, expanded, now }) {
     blocks.push(h('p', { class: 'muted' }, 'Nessun testo della conversazione: questa sessione è nota solo dalla sincronizzazione periodica.'));
   }
 
-  const facts = [
-    ['Host', s.host ?? (s.source === 'cloud' ? 'cloud' : '—')],
-    ['Dispositivo', s.entrypoint ? `${dev.label} (${s.entrypoint})` : dev.label],
-    ['Ultima attività', h('span', { 'data-rel': 'ago', 'data-t': s.last_activity_at }, agoText(now - s.last_activity_at))],
-  ];
-  blocks.push(h('dl', { class: 'facts' }, facts.map(([k, v]) => [h('dt', {}, k), h('dd', {}, v)])));
+  // Spec sheet, in mono: the technical numbers.
+  const specs = [];
+  const pct = contextPercent(s.context_used, s.context_max);
+  if (pct != null) {
+    const high = pct >= CONTEXT_WARN;
+    const fill = h('span', { class: 'ctx-fill' });
+    fill.style.width = `${pct}%`;
+    specs.push(['Contesto', h('span', { class: `ctx${high ? ' ctx-high' : ''}` }, h('span', {}, `${pct}%${high ? ', quasi pieno' : ''}`), h('span', { class: 'ctx-bar', 'aria-hidden': 'true' }, fill))]);
+  }
+  if (s.cost_usd != null) specs.push(['Costo', money(s.cost_usd)]);
+  specs.push(['Host', s.host ?? (s.source === 'cloud' ? 'cloud' : '—')]);
+  specs.push(['Dispositivo', s.entrypoint ? `${dev.label} (${s.entrypoint})` : dev.label]);
+  specs.push(['Ultima attività', h('span', { 'data-rel': 'ago', 'data-t': s.last_activity_at }, agoText(now - s.last_activity_at))]);
+  blocks.push(h('dl', { class: 'specs mono' }, specs.map(([k, v]) => h('div', { class: 'spec' }, h('dt', {}, k), h('dd', {}, v)))));
 
   if (s.from_snapshot) {
     blocks.push(
-      h('p', { class: 'hint hint-block' }, icon('snapshot'), 'Stato ricavato dalla sincronizzazione periodica con claude.ai, non da un evento in diretta: può essere indietro di qualche minuto.'),
+      h('p', { class: 'hint' }, icon('snapshot'), 'Stato ricavato dalla sincronizzazione periodica con claude.ai, non da un evento in diretta: può essere indietro di qualche minuto.'),
     );
   }
+  blocks.push(actions(s, dev, pending));
   return h('div', { class: 'details', id: `${id}-details`, hidden: !expanded }, blocks);
+}
+
+function actions(s, dev, pending) {
+  const open = s.url
+    ? h(
+        'a',
+        { class: 'btn btn-filled', href: s.url, target: '_blank', rel: 'noopener' },
+        'Apri in Claude',
+        icon('external'),
+        h('span', { class: 'sr-only' }, '(si apre in una nuova scheda)'),
+      )
+    : h('p', { class: 'local-note' }, icon(dev.icon), s.host ? `Sessione locale su ${s.host}` : 'Sessione locale');
+
+  let archive = null;
+  if (s.dismissed) {
+    archive = h('button', { type: 'button', class: 'btn btn-plain', 'data-action': 'restore', disabled: pending }, icon('restore'), pending ? 'Ripristino…' : 'Ripristina');
+  } else if (s.state !== 'working' && s.state !== 'done') {
+    archive = h('button', { type: 'button', class: 'btn btn-plain', 'data-action': 'dismiss', disabled: pending }, icon('archive'), 'Archivia');
+  }
+  return h('div', { class: 'row-actions' }, open, archive);
 }
 
 /** Message text with line breaks kept; **bold** and `code` rendered, everything else literal. */
@@ -187,7 +205,7 @@ function richText(text) {
 export function refreshTimes(root, now) {
   for (const el of root.querySelectorAll('[data-rel]')) {
     const ms = now - Number(el.dataset.t);
-    const text = el.dataset.rel === 'since' ? sinceText(ms) : el.dataset.rel === 'quiet' ? quietText(ms) : agoText(ms);
+    const text = el.dataset.rel === 'elapsed' ? elapsedText(ms) : el.dataset.rel === 'quiet' ? quietText(ms) : agoText(ms);
     if (el.textContent !== text) el.textContent = text;
   }
 }

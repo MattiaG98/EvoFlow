@@ -1,7 +1,7 @@
 // EvoFlow dashboard: login, polling, rendering, actions, diary.
 
 import * as api from './api.js';
-import { buildCard, refreshTimes } from './cards.js';
+import { buildCard, light, refreshTimes } from './cards.js';
 import { h, icon } from './dom.js';
 import { ATTENTION, STATES, STATE_ORDER, calmSummary, countPhrase, dateTime, freshnessText } from './format.js';
 
@@ -17,7 +17,10 @@ const ui = {
   loginError: $('login-error'),
   loginSubmit: $('login-submit'),
   dashboard: $('dashboard'),
+  topbar: $('topbar'),
+  hero: $('hero'),
   freshness: $('freshness'),
+  liveLabel: $('live-label'),
   freshnessText: $('freshness-text'),
   offline: $('offline'),
   loading: $('loading'),
@@ -25,7 +28,8 @@ const ui = {
   summaryLive: $('summary-live'),
   calm: $('calm'),
   calmSub: $('calm-sub'),
-  chips: $('chips'),
+  tiles: $('tiles'),
+  clearFilter: $('clear-filter'),
   empty: $('empty'),
   board: $('board'),
   colAttention: $('col-attention'),
@@ -62,12 +66,10 @@ const state = {
 
 const serverNow = () => Date.now() + state.offset;
 
-// ---------- static structure: one section and one filter chip per state ----------
+// ---------- static structure: one list section and one status tile per state ----------
 
 const sections = {};
-const chips = {};
-let chipsBreak;
-const clearChip = h('button', { type: 'button', class: 'chip chip-clear', hidden: true }, icon('close'), 'Mostra tutte');
+const tiles = {};
 
 for (const st of STATE_ORDER) {
   const meta = STATES[st];
@@ -79,10 +81,9 @@ for (const st of STATE_ORDER) {
     toggle = h(
       'button',
       { type: 'button', class: 'group-toggle', 'aria-expanded': 'false', 'aria-controls': list.id },
-      icon(st),
       h('span', {}, meta.heading),
       count,
-      icon('chevron', 'chevron'),
+      icon('disclosure', 'chevron'),
     );
     toggle.addEventListener('click', () => {
       state.doneOpen = !state.doneOpen;
@@ -90,22 +91,25 @@ for (const st of STATE_ORDER) {
     });
     title = h('h2', { class: 'group-title', id: `h-${st}` }, toggle);
   } else {
-    title = h('h2', { class: 'group-title', id: `h-${st}` }, icon(st), h('span', {}, meta.heading), count);
+    title = h('h2', { class: 'group-title', id: `h-${st}` }, h('span', {}, meta.heading), count);
   }
-  const section = h('section', { class: `group group-${st}${ATTENTION.has(st) ? ' group-attn' : ''}`, 'aria-labelledby': title.id, hidden: true }, title, list);
+  const section = h('section', { class: `group group-${st}${ATTENTION.has(st) ? ' is-attention' : ''}`, 'aria-labelledby': title.id, hidden: true }, title, list);
   sections[st] = { section, list, count, toggle };
   (ATTENTION.has(st) ? ui.colAttention : ui.colRest).append(section);
 
-  const label = h('span');
-  const chip = h('button', { type: 'button', class: `chip chip-${st}${ATTENTION.has(st) ? ' chip-attn' : ''}`, 'aria-pressed': 'false', hidden: true }, icon(st), label);
-  chip.addEventListener('click', () => setFilter(state.filter === st ? null : st));
-  chips[st] = { chip, label };
-  ui.chips.append(chip);
-  // On phones, "needs you" chips get their own row(s).
-  if (st === 'forgotten') ui.chips.append((chipsBreak = h('span', { class: 'chips-break', 'aria-hidden': 'true' })));
+  // Status board tile: light + big number + label; it is also the filter toggle for its state.
+  const num = h('span', { class: 'tile-num' });
+  const tile = h(
+    'button',
+    { type: 'button', class: `tile tile-${st}`, 'aria-pressed': 'false' },
+    h('span', { class: 'tile-top' }, light(st, st === 'working' ? ' is-pulsing' : ''), h('span', { class: 'tile-label' }, meta.heading)),
+    num,
+  );
+  tile.addEventListener('click', () => setFilter(state.filter === st ? null : st));
+  tiles[st] = { tile, num };
+  ui.tiles.append(tile);
 }
-ui.chips.append(clearChip);
-clearChip.addEventListener('click', () => setFilter(null));
+ui.clearFilter.addEventListener('click', () => setFilter(null));
 ui.lostBtn.append(icon('compass'), h('span', {}, 'Mi sono perso'));
 
 function setFilter(st) {
@@ -141,14 +145,16 @@ function renderSummary() {
   ui.calmSub.textContent = calm ? calmSummary(counts) : '';
 
   for (const st of STATE_ORDER) {
-    const { chip, label } = chips[st];
+    const { tile, num } = tiles[st];
     const n = counts[st] ?? 0;
-    chip.hidden = n === 0;
-    label.textContent = countPhrase(st, n);
-    chip.setAttribute('aria-pressed', String(state.filter === st));
+    num.textContent = String(n);
+    tile.setAttribute('aria-label', countPhrase(st, n));
+    tile.setAttribute('aria-pressed', String(state.filter === st));
+    // Nothing to filter at zero: dimmed and out of the tab order.
+    tile.disabled = n === 0;
+    tile.classList.toggle('is-zero', n === 0);
   }
-  clearChip.hidden = !state.filter;
-  chipsBreak.hidden = calm || STATE_ORDER.every((st) => ATTENTION.has(st) || !counts[st]);
+  ui.clearFilter.hidden = !state.filter;
 
   const live = calm ? `Nessuno ti aspetta. ${calmSummary(counts)}` : attention.map((st) => countPhrase(st, counts[st])).join(', ');
   if (ui.summaryLive.textContent !== live) ui.summaryLive.textContent = live;
@@ -236,7 +242,11 @@ function updateTitle() {
   if (navigator.setAppBadge) (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
 }
 
+/** The status line under the title: "● LIVE · AGGIORNATO 3 S FA"; the light turns red offline, grey when stale. */
 function updateFreshness() {
+  const offline = ui.freshness.classList.contains('is-offline');
+  const label = offline ? 'Offline' : state.data ? 'Live' : 'Collegamento';
+  if (ui.liveLabel.textContent !== label) ui.liveLabel.textContent = label;
   if (!state.data) return;
   const age = Date.now() - state.receivedAt;
   const text = freshnessText(age);
@@ -249,6 +259,24 @@ function setOffline(offline) {
   if (ui.offline.textContent !== text) ui.offline.textContent = text;
   ui.freshness.classList.toggle('is-offline', offline);
   ui.loading.textContent = offline ? 'Le sessioni compaiono appena torna la connessione.' : 'Carico le sessioni…';
+  updateFreshness();
+}
+
+// iOS large title: the compact title and the bar material appear once the large title scrolls away.
+if ('IntersectionObserver' in window) {
+  // A hidden dashboard reports a zero-size title: that is not "scrolled away".
+  new IntersectionObserver(([entry]) => ui.topbar.classList.toggle('is-scrolled', !entry.isIntersecting && entry.boundingClientRect.height > 0), {
+    rootMargin: '-56px 0px 0px 0px',
+  }).observe(ui.hero.querySelector('.large-title'));
+}
+
+// Bottom sheets stay above the on-screen keyboard (iOS does not resize the layout viewport).
+if (window.visualViewport) {
+  const vv = window.visualViewport;
+  const syncKeyboard = () =>
+    document.documentElement.style.setProperty('--keyboard', `${Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))}px`);
+  vv.addEventListener('resize', syncKeyboard);
+  vv.addEventListener('scroll', syncKeyboard);
 }
 
 // Relative times move on their own between polls.

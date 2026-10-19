@@ -6,8 +6,8 @@
   <title>EvoFlow</title>
   <meta name="description" content="Le tue sessioni Claude Code in parallelo: chi ti aspetta adesso, e perché.">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f5f5f2" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -24,27 +24,24 @@
   <!-- Login: shown when any /api call answers 401. -->
   <main id="login" class="login" hidden>
     <form id="login-form" class="login-card" novalidate>
-      <img src="icon.svg" alt="" width="56" height="56">
+      <img src="icon.svg" alt="" width="72" height="72">
       <h1>EvoFlow</h1>
       <p class="login-sub">Chi ti aspetta adesso, e perché.</p>
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" enterkeyhint="go" required>
+      <div class="field-row">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" enterkeyhint="go" required>
+      </div>
       <p id="login-error" class="form-error" role="alert"></p>
-      <button id="login-submit" type="submit" class="btn btn-primary btn-block">Entra</button>
+      <button id="login-submit" type="submit" class="btn btn-filled btn-large btn-block">Entra</button>
     </form>
   </main>
 
   <div id="dashboard" hidden>
-    <header class="topbar">
+    <!-- iOS navigation bar: transparent over the large title, a material bar once it scrolls away. -->
+    <header id="topbar" class="topbar">
       <div class="wrap topbar-inner">
-        <div class="brand">
-          <img src="icon.svg" alt="" width="32" height="32">
-          <div class="brand-text">
-            <h1>EvoFlow</h1>
-            <p id="freshness" class="freshness"><span class="live-dot" aria-hidden="true"></span><span id="freshness-text">collegamento…</span></p>
-          </div>
-        </div>
-        <button id="lost-btn" type="button" class="btn btn-secondary btn-lost"></button>
+        <span class="nav-title" aria-hidden="true">EvoFlow</span>
+        <button id="lost-btn" type="button" class="bar-btn"></button>
       </div>
       <div class="wrap">
         <p id="offline" class="offline" role="status"></p>
@@ -52,16 +49,30 @@
     </header>
 
     <main id="main" class="wrap">
+      <div id="hero" class="hero">
+        <h1 class="large-title">EvoFlow</h1>
+        <p id="freshness" class="status-line">
+          <span class="light" aria-hidden="true"></span>
+          <span id="live-label">Collegamento</span>
+          <span aria-hidden="true">·</span>
+          <span id="freshness-text">in corso…</span>
+        </p>
+      </div>
+
       <p id="loading" class="loading">Carico le sessioni…</p>
 
       <section id="summary" class="summary" aria-labelledby="summary-title" hidden>
-        <h2 id="summary-title" class="sr-only">Riepilogo</h2>
         <p id="summary-live" class="sr-only" aria-live="polite" aria-atomic="true"></p>
         <div id="calm" class="calm" hidden>
           <p class="calm-title">Nessuno ti aspetta.</p>
           <p id="calm-sub" class="calm-sub"></p>
         </div>
-        <div id="chips" class="chips" role="group" aria-label="Filtra per stato"></div>
+        <div class="section-head">
+          <h2 id="summary-title" class="section-label">Stato</h2>
+          <button id="clear-filter" type="button" class="text-btn" hidden>Mostra tutte</button>
+        </div>
+        <!-- Status board: one tile per state, each a filter toggle. -->
+        <div id="tiles" class="tiles" role="group" aria-label="Filtra per stato"></div>
       </section>
 
       <section id="empty" class="empty" aria-labelledby="empty-title" hidden>
@@ -77,36 +88,40 @@
     </main>
 
     <footer class="footer wrap">
-      <button id="diary-btn" type="button" class="link-btn">Diario</button>
+      <button id="diary-btn" type="button" class="text-btn">Diario</button>
       <span aria-hidden="true">·</span>
-      <button id="logout-btn" type="button" class="link-btn">Esci</button>
+      <button id="logout-btn" type="button" class="text-btn">Esci</button>
     </footer>
   </div>
 
   <!-- "Mi sono perso": one tap to log the moment the user lost track. -->
   <dialog id="lost-dialog" class="sheet" aria-labelledby="lost-title">
-    <form id="lost-form" class="sheet-body">
-      <h2 id="lost-title" tabindex="-1" autofocus>Mi sono perso</h2>
-      <p class="sheet-sub">Segno questo momento nel diario, insieme a quanti agenti ti aspettavano.</p>
-      <label for="lost-note">Cosa è successo? (facoltativo)</label>
-      <textarea id="lost-note" rows="3" maxlength="1000"></textarea>
-      <p id="lost-error" class="form-error" role="alert"></p>
-      <div class="sheet-actions">
-        <button type="button" class="link-btn" data-open-diary>Vedi il diario</button>
-        <span class="spacer"></span>
-        <button type="button" class="btn btn-ghost" data-close>Annulla</button>
-        <button id="lost-submit" type="submit" class="btn btn-primary">Annota</button>
+    <form id="lost-form" class="sheet-inner">
+      <span class="grabber" aria-hidden="true"></span>
+      <div class="sheet-bar">
+        <button type="button" class="text-btn" data-close>Annulla</button>
+        <h2 id="lost-title" tabindex="-1" autofocus>Mi sono perso</h2>
+        <button id="lost-submit" type="submit" class="text-btn text-btn-strong">Annota</button>
+      </div>
+      <div class="sheet-content">
+        <p class="sheet-sub">Segno questo momento nel diario, insieme a quanti agenti ti aspettavano.</p>
+        <label for="lost-note" class="field-label">Cosa è successo? (facoltativo)</label>
+        <textarea id="lost-note" class="field" rows="4" maxlength="1000"></textarea>
+        <p id="lost-error" class="form-error" role="alert"></p>
+        <button type="button" class="text-btn sheet-link" data-open-diary>Vedi il diario</button>
       </div>
     </form>
   </dialog>
 
   <dialog id="diary-dialog" class="sheet sheet-tall" aria-labelledby="diary-title">
-    <div class="sheet-body">
-      <div class="sheet-head">
+    <div class="sheet-inner">
+      <span class="grabber" aria-hidden="true"></span>
+      <div class="sheet-bar">
+        <span></span>
         <h2 id="diary-title" tabindex="-1" autofocus>Diario</h2>
-        <button type="button" class="btn btn-ghost" data-close>Chiudi</button>
+        <button type="button" class="text-btn text-btn-strong" data-close>Chiudi</button>
       </div>
-      <div id="diary-list" class="diary-list"></div>
+      <div id="diary-list" class="sheet-content diary-list"></div>
     </div>
   </dialog>
 

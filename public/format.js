@@ -44,8 +44,8 @@ export function duration(ms) {
   return days === 1 ? '1 giorno' : `${days} giorni`;
 }
 
-/** "da 3 min": how long a state has lasted. */
-export const sinceText = (ms) => (ms < MIN ? 'adesso' : `da ${duration(ms)}`);
+/** "12 min": how long a state has lasted, as the trailing time of a row (iOS Mail style). */
+export const elapsedText = (ms) => (ms < MIN ? 'adesso' : duration(ms));
 
 /** "3 min fa". */
 export const agoText = (ms) => (ms < MIN ? 'adesso' : `${duration(ms)} fa`);

@@ -1,7 +1,7 @@
 // EvoFlow service worker: keeps the app shell available for offline launch.
 // It never touches /api/*: session data must always come live from the server.
 
-const CACHE = 'evoflow-shell-v1';
+const CACHE = 'evoflow-shell-v2';
 const SHELL = [
   './',
   'index.html',

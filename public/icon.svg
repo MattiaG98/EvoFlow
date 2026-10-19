@@ -1,12 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Three agents as lanes; the amber one is waiting for you. -->
-  <rect width="512" height="512" rx="112" fill="#17293c"/>
-  <g stroke-linecap="round" stroke-width="34" fill="none">
-    <path d="M214 160H384" stroke="#4d6a87"/>
-    <path d="M214 256H384" stroke="#eef2f6"/>
-    <path d="M214 352H340" stroke="#4d6a87"/>
-  </g>
-  <circle cx="142" cy="160" r="26" fill="#4d6a87"/>
-  <circle cx="142" cy="256" r="40" fill="#f2a43a"/>
-  <circle cx="142" cy="352" r="26" fill="#4d6a87"/>
+  <!-- Three sessions as list rows on true black; the glowing orange light is the one waiting for you. -->
+  <defs>
+    <filter id="glow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="12"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#000000"/>
+  <circle cx="150" cy="164" r="34" fill="#ff9f0a" filter="url(#glow)"/>
+  <circle cx="150" cy="164" r="27" fill="#ff9f0a"/>
+  <rect x="210" y="149" width="172" height="30" rx="15" fill="#f2f2f7"/>
+  <circle cx="150" cy="256" r="30" fill="#30d158" filter="url(#glow)" opacity="0.55"/>
+  <circle cx="150" cy="256" r="22" fill="#30d158"/>
+  <rect x="210" y="241" width="132" height="30" rx="15" fill="#48484a"/>
+  <circle cx="150" cy="348" r="22" fill="#8e8e93"/>
+  <rect x="210" y="333" width="152" height="30" rx="15" fill="#48484a"/>
 </svg>

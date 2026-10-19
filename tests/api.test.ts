@@ -141,3 +141,17 @@ test('sessions silent for more than 60 days drop off the dashboard', async () =>
   const data = await (await call(env, 'GET', '/api/sessions', { token: PASSWORD })).json();
   assert.deepEqual(data.sessions.map((s: any) => s.key), ['session_01Recent']);
 });
+
+test('the timeline endpoint reconstructs recent history from the event log', async () => {
+  const env = makeEnv();
+  const post = (b: unknown) => call(env, 'POST', '/api/events', { body: b, token: TOKEN });
+  await post(hook('s1', 'UserPromptSubmit', { prompt: 'Deploy' }));
+  await post(hook('s1', 'PreToolUse', { tool_name: 'Bash' }));
+  await post(hook('s1', 'Notification', { message: 'Claude needs your permission to use Bash' }));
+  assert.equal((await call(env, 'GET', '/api/timeline?hours=6', { token: TOKEN })).status, 401, 'reads need the password');
+  const t = await (await call(env, 'GET', '/api/timeline?hours=6', { token: PASSWORD })).json();
+  assert.equal(t.to - t.from, 6 * 3600_000);
+  assert.equal(t.lanes.length, 1);
+  assert.equal(t.lanes[0].title, 'Deploy');
+  assert.deepEqual(t.lanes[0].segments.map((s: any) => s.state), ['working', 'waiting']);
+});

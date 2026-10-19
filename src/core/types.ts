@@ -95,6 +95,21 @@ export interface SessionsResponse {
   sessions: DerivedSession[];
 }
 
+export interface TimelineSegment {
+  state: State;
+  from: number;
+  to: number;
+}
+
+/** GET /api/timeline: each session's recent history as colored segments, most urgent sessions first. */
+export interface TimelineResponse {
+  from: number;
+  to: number;
+  /** Total time, across sessions, spent waiting on you inside the window (waiting + forgotten). */
+  waiting_ms: number;
+  lanes: { key: string; title: string; state: State; segments: TimelineSegment[] }[];
+}
+
 export interface DiaryEntry {
   id: number;
   created_at: number;

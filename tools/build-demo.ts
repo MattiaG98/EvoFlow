@@ -14,6 +14,7 @@ const MODULES: [key: string, path: string][] = [
   ['types', 'src/core/types.ts'],
   ['state', 'src/core/state.ts'],
   ['ingest', 'src/core/ingest.ts'],
+  ['timeline', 'src/core/timeline.ts'],
   ['dom', 'public/dom.js'],
   ['format', 'public/format.js'],
   ['cards', 'public/cards.js'],

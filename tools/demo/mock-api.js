@@ -3,6 +3,7 @@
 // Same exports as public/api.js; tools/build-demo.ts swaps it in.
 import { applyEvent, applySnapshot, sessionKey } from '../../src/core/ingest.ts';
 import { countByState, deriveSession, sortSessions } from '../../src/core/state.ts';
+import { buildTimeline } from '../../src/core/timeline.ts';
 import { DEFAULT_CONFIG } from '../../src/core/types.ts';
 import scenario from '../../tests/fixtures/scenario-demo.json';
 
@@ -30,7 +31,31 @@ const meta = (remote, extra) => ({ source: remote ? 'cloud' : 'local', remote_se
 const A = { id: 'a1111111-0000-5000-8000-000000000001', meta: meta('cse_01DemoWorkingAAAAAAAAAAA', { entrypoint: 'remote_mobile', repo: 'demo/shop-app', branch: 'claude/checkout-refactor-x1y2' }) };
 const B = { id: 'b2222222-0000-5000-8000-000000000002', meta: meta('cse_01DemoPermissionBBBBBBBB', { entrypoint: 'remote_web', repo: 'demo/api-server', branch: 'claude/rate-limit-k8s9' }) };
 const F = { id: 'f6666666-0000-5000-8000-000000000006', meta: meta('cse_01DemoDocsFFFFFFFFFFFFF', { entrypoint: 'remote_mobile', repo: 'demo/api-server', branch: 'claude/api-docs-m2n3' }) };
+const C = { id: 'c3333333-0000-4000-8000-000000000003', meta: meta(undefined, { entrypoint: 'claude-desktop', host: 'MacBook-Pro', repo: 'demo/landing', branch: 'feature/hero-copy' }) };
+const D = { id: 'd4444444-0000-5000-8000-000000000004', meta: meta('cse_01DemoReviewDDDDDDDDDDDD', { entrypoint: 'remote_mobile', repo: 'demo/mobile', branch: 'claude/offline-sync-p3q4' }) };
+const G = { id: 'g7777777-0000-4000-8000-000000000007', meta: meta(undefined, { entrypoint: 'cli', host: 'MacBook-Pro', repo: 'demo/api-server', branch: 'chore/deps' }) };
 const ev = (s, hook_event_name, extra = {}) => ({ v: 1, meta: s.meta, payload: { session_id: s.id, hook_event_name, ...extra } });
+
+// Earlier turns of the same sessions, in minutes ago, so the 12-hour timeline has a story to show.
+const HISTORY = [
+  [D, 700, 'UserPromptSubmit'],
+  [G, 650, 'UserPromptSubmit', { prompt: 'Aggiorna le dipendenze con vulnerabilità note' }],
+  [B, 600, 'UserPromptSubmit'],
+  [D, 610, 'Stop', { last_assistant_message: 'Schema del database locale pronto.' }],
+  [G, 560, 'Stop', { last_assistant_message: 'Aggiornate 7 dipendenze, test verdi.' }],
+  [G, 540, 'SessionEnd', { reason: 'prompt_input_exit' }],
+  [B, 520, 'Notification', { message: 'Claude needs your permission to use Bash', notification_type: 'permission_prompt' }],
+  [C, 500, 'UserPromptSubmit'],
+  [B, 455, 'PostToolUse', { tool_name: 'Bash', tool_input: { description: 'Run migrations' } }],
+  [C, 420, 'Stop', { last_assistant_message: 'Hero aggiornata con il nuovo payoff.' }],
+  [A, 400, 'UserPromptSubmit'],
+  [B, 380, 'Stop', { last_assistant_message: 'Migrazioni applicate. Procedo con il rate limiting?' }],
+  [A, 330, 'Stop', { last_assistant_message: 'Ho mappato il flusso di checkout attuale. Vuoi che proceda con il refactor?' }],
+  [D, 300, 'UserPromptSubmit'],
+  [D, 240, 'Stop', { last_assistant_message: 'Quale strategia di conflitto preferisci?' }],
+  [A, 210, 'UserPromptSubmit'],
+  [A, 150, 'Stop', { last_assistant_message: 'Analisi completata.' }],
+].sort((x, y) => y[1] - x[1]);
 
 // What happens after the page opens, in seconds.
 const TIMELINE = [
@@ -46,6 +71,7 @@ const TIMELINE = [
 ];
 
 let rows;
+let logs;
 let diary;
 let loggedIn;
 let timers = [];
@@ -55,16 +81,20 @@ function put(row) {
 }
 
 function ingest(envelope, at) {
-  put(applyEvent(rows.get(sessionKey(envelope)) ?? null, envelope, at).row);
+  const out = applyEvent(rows.get(sessionKey(envelope)) ?? null, envelope, at);
+  put(out.row);
+  if (out.log) logs.push(out.log);
 }
 
 /** Loads the example sessions with realistic ages, then schedules the live timeline. */
 export function resetDemo() {
   timers.forEach(clearTimeout);
   rows = new Map();
+  logs = [];
   diary = [];
   loggedIn = true;
   const now = Date.now();
+  for (const [s, minutesAgo, event, extra] of HISTORY) ingest(ev(s, event, extra), now - minutesAgo * MIN);
   const step = new Map();
   for (const s of scenario.steps) {
     if (s.event) {
@@ -132,6 +162,13 @@ function setDismissed(key, at) {
 
 export const dismiss = async (key) => setDismissed(key, Date.now());
 export const restore = async (key) => setDismissed(key, null);
+export async function getTimeline(hours = 12) {
+  guard();
+  const now = Date.now();
+  const derived = [...rows.values()].map((r) => deriveSession(r, now, DEFAULT_CONFIG));
+  return delay(buildTimeline(logs, derived, now - hours * HOUR, now, DEFAULT_CONFIG));
+}
+
 export const getDiary = async () => (guard(), delay({ entries: [...diary].reverse() }));
 
 export async function addDiary(note) {

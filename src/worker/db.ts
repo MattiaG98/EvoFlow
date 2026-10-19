@@ -82,6 +82,14 @@ export function logStatement(db: D1Database, log: LogEntry) {
     .bind(log.key, log.at, log.event, log.summary);
 }
 
+export async function listEvents(db: D1Database, since: number): Promise<LogEntry[]> {
+  const { results } = await db
+    .prepare('SELECT key, at, event, summary FROM events WHERE at >= ? ORDER BY at LIMIT 20000')
+    .bind(since)
+    .all<LogEntry>();
+  return results;
+}
+
 export async function setDismissed(db: D1Database, key: string, at: number | null): Promise<boolean> {
   const res = await db.prepare('UPDATE sessions SET dismissed_at = ? WHERE key = ?').bind(at, key).run();
   return Number(res.meta?.changes ?? 0) > 0;

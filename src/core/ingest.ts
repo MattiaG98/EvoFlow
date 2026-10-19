@@ -1,7 +1,7 @@
-import { excerpt } from './state.ts';
+import { excerpt, trailingQuestion } from './state.ts';
 import type { HookEnvelope, HookPayload, SessionRow, Source } from './types.ts';
 
-/** One line of the event log, kept for the coverage check and for debugging. Tool calls are not logged. */
+/** One line of the event log: lifecycle events and state changes, the source of the timeline. Routine tool calls are not logged. */
 export interface LogEntry {
   key: string;
   at: number;
@@ -126,11 +126,15 @@ export function applyEvent(
       break;
     }
     case 'PreToolUse':
-    case 'PostToolUse':
+    case 'PostToolUse': {
+      // Tool calls are logged only when they change the state (e.g. work resuming after a permission prompt).
+      const wasWorking = row.last_event != null && WORKING_EVENTS.has(row.last_event);
       row.activity = toolActivity(p);
       row.notification = null;
       mark(event);
+      if (!wasWorking) summary = row.activity;
       break;
+    }
     case 'Notification': {
       if (isIdleNotification(p)) {
         // "Claude is waiting for your input" after a finished turn: the Stop already says so.
@@ -146,7 +150,8 @@ export function applyEvent(
       row.activity = null;
       row.notification = null;
       mark(event);
-      summary = excerpt(row.last_message, 160);
+      // Keep the question itself when the turn ends on one: the timeline reads it back to tell waiting from review.
+      summary = trailingQuestion(row.last_message) ?? excerpt(row.last_message, 160);
       break;
     case 'SubagentStop':
       // A background agent can finish after the main turn ended: that must not flip the session back to working.

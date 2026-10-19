@@ -7,12 +7,14 @@ import {
   type SnapshotItem,
 } from '../core/ingest.ts';
 import { countByState, deriveSession, sortSessions } from '../core/state.ts';
+import { buildTimeline } from '../core/timeline.ts';
 import { DEFAULT_CONFIG, type HookEnvelope, type SessionsResponse, type StateConfig } from '../core/types.ts';
 import {
   addDiary,
   ensureSchema,
   getSession,
   listDiary,
+  listEvents,
   listSessions,
   logStatement,
   prune,
@@ -125,6 +127,15 @@ async function route(request: Request, url: URL, env: Env): Promise<Response> {
     return new Response(null, { status: 204 });
   }
 
+  if (pathname === '/api/timeline' && method === 'GET') {
+    const hours = Math.min(48, Math.max(1, Number(url.searchParams.get('hours')) || 12));
+    const from = now - hours * 3600_000;
+    const { config, derived } = await deriveAll(env, now);
+    // Look further back than the window so a state that began before it starts at the left edge with its true age.
+    const events = await listEvents(env.DB, from - config.forgottenMs);
+    return json(buildTimeline(events, derived, from, now, config));
+  }
+
   if (pathname === '/api/diary' && method === 'GET') {
     return json({ entries: await listDiary(env.DB, 200) });
   }
@@ -139,9 +150,14 @@ async function route(request: Request, url: URL, env: Env): Promise<Response> {
   throw new HttpError(404, 'not found');
 }
 
-async function sessionsResponse(env: Env, now: number): Promise<SessionsResponse> {
+async function deriveAll(env: Env, now: number) {
   const config = configFrom(env);
   const derived = sortSessions((await listSessions(env.DB, now - SESSION_WINDOW_MS)).map((r) => deriveSession(r, now, config)));
+  return { config, derived };
+}
+
+async function sessionsResponse(env: Env, now: number): Promise<SessionsResponse> {
+  const { config, derived } = await deriveAll(env, now);
   const counts = countByState(derived);
   let done = 0;
   const sessions = derived.filter((s) => s.state !== 'done' || ++done <= MAX_DONE_SESSIONS);

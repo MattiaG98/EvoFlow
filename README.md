@@ -16,4 +16,5 @@ I dati arrivano dagli hook di Claude Code (sessioni cloud e locali) e da una ric
 npm run dev                                                    # http://localhost:8787, password "dev"
 node tools/replay.ts tests/fixtures/scenario-demo.json --fast  # in un secondo terminale: dati demo
 npm test
+node tools/build-demo.ts                                       # demo.html: pagina unica con dati di esempio, da condividere
 ```

@@ -1,17 +1,21 @@
-// Builds one session row of an inset grouped list. Pure DOM construction: behaviour lives in app.js
-// (delegated clicks on data-action). The row keeps the class `card` for scripts and tests.
+// DOM builders for the home and the lists: session rows, the "Adesso" focus card, the wait meter and
+// the 12-hour timeline. Pure construction: behaviour lives in app.js (delegated clicks on data-action).
+// A session row keeps the class `card` for scripts and tests.
 
 import { h, icon } from './dom.js';
 import {
   ATTENTION,
   STATES,
   agoText,
+  clock,
   contextPercent,
   device,
+  durationLong,
   elapsedText,
   localizeReason,
   money,
   quietText,
+  waitCaption,
 } from './format.js';
 
 const CONTEXT_WARN = 80;
@@ -27,8 +31,9 @@ export const light = (state, extra = '') => h('span', { class: `light light-${st
  * @param opts.now       server-clock "now", epoch ms
  * @param opts.expanded  details open
  * @param opts.pending   an archive/restore request for it is in flight
+ * @param opts.forgottenMs  the "forgotten" threshold, for the wait meter
  */
-export function buildCard(s, { now, expanded, pending }) {
+export function buildCard(s, { now, expanded, pending, forgottenMs }) {
   const meta = STATES[s.state] ?? STATES.review;
   const id = domId(s.key);
   const dev = device(s.entrypoint, s.source);
@@ -72,6 +77,7 @@ export function buildCard(s, { now, expanded, pending }) {
       s.state === 'waiting' && s.activity && s.activity !== s.reason
         ? h('p', { class: 'activity' }, h('span', { class: 'activity-label' }, 'Vuole eseguire'), h('code', {}, s.activity))
         : null,
+      hasWait(s) ? waitMeter(s, forgottenMs, now) : null,
       // Line 3: state, device, repository; the quick "Apri" capsule on the right.
       h(
         'div',
@@ -189,6 +195,186 @@ function actions(s, dev, pending) {
   return h('div', { class: 'row-actions' }, open, archive);
 }
 
+// ---------- wait meter ----------
+
+const HOUR = 3_600_000;
+const hasWait = (s) => s.state === 'waiting' || s.state === 'forgotten';
+
+/** Meter geometry and text for a wait that began at `since`. */
+function waitValues(since, forgottenMs, now) {
+  const age = Math.max(0, now - since);
+  const over = age >= forgottenMs;
+  return {
+    pct: Math.min(100, (age / forgottenMs) * 100),
+    over,
+    hours: Math.min(forgottenMs, age) / HOUR,
+    caption: waitCaption(age, forgottenMs),
+  };
+}
+
+/**
+ * Thin meter of the wait age toward the "forgotten" threshold. The fill carries severity (waiting tint,
+ * forgotten tint past the threshold); the track is a lighter step of the same hue. Kept live by refreshTimes.
+ */
+export function waitMeter(s, forgottenMs, now, size = 'row') {
+  const v = waitValues(s.since, forgottenMs, now);
+  const fill = h('span', { class: 'meter-fill' });
+  fill.style.width = `${v.pct}%`;
+  return h(
+    'div',
+    { class: `wait wait-${size}${v.over ? ' is-over' : ''}`, 'data-wait': s.since, 'data-max': forgottenMs },
+    h(
+      'div',
+      {
+        class: 'meter',
+        role: 'meter',
+        'aria-label': 'Attesa',
+        'aria-valuemin': '0',
+        'aria-valuemax': String(Math.round(forgottenMs / HOUR)),
+        'aria-valuenow': v.hours.toFixed(1),
+        'aria-valuetext': v.caption,
+      },
+      fill,
+    ),
+    h('p', { class: 'wait-caption mono' }, v.caption),
+  );
+}
+
+// ---------- "Adesso" focus card ----------
+
+/**
+ * The single most urgent session, large: what it asks, how long it has waited, and what to do.
+ * @param opts.position  1-based index in the to-do queue; opts.total its length
+ * @param opts.next      up to two sessions that come after it
+ */
+export function buildFocus(s, { now, forgottenMs, position, total, next }) {
+  const dev = device(s.entrypoint, s.source);
+  const reason = s.reason ? localizeReason(s.reason) : '';
+  const open = s.url
+    ? h('a', { class: 'btn btn-filled btn-large btn-block', href: s.url, target: '_blank', rel: 'noopener' }, 'Apri in Claude', icon('external'), h('span', { class: 'sr-only' }, '(si apre in una nuova scheda)'))
+    : h('p', { class: 'local-note focus-local' }, icon(dev.icon), s.host ? `Sessione locale su ${s.host}` : 'Sessione locale');
+  return h(
+    'div',
+    { class: `focus-card tone-${s.state}`, 'data-key': s.key },
+    h(
+      'p',
+      { class: 'focus-eyebrow mono' },
+      light(s.state),
+      h('span', { class: 'focus-now' }, 'Adesso'),
+      h('span', { class: 'focus-state' }, STATES[s.state].label),
+      total > 1 ? h('span', { class: 'focus-pos' }, `${position} di ${total}`) : null,
+    ),
+    h('h3', { class: 'focus-title' }, s.title),
+    reason && reason !== s.title ? h('p', { class: 'focus-reason' }, reason) : null,
+    s.state === 'waiting' && s.activity && s.activity !== s.reason
+      ? h('p', { class: 'activity' }, h('span', { class: 'activity-label' }, 'Vuole eseguire'), h('code', {}, s.activity))
+      : null,
+    hasWait(s)
+      ? waitMeter(s, forgottenMs, now, 'focus')
+      : h('p', { class: 'wait-caption mono' }, `${STATES[s.state].label} `, h('span', { 'data-rel': 'ago', 'data-t': s.since }, agoText(now - s.since))),
+    open,
+    h(
+      'div',
+      { class: 'focus-actions' },
+      total > 1 ? h('button', { type: 'button', class: 'btn btn-tinted', 'data-action': 'next' }, 'Dopo', icon('disclosure')) : null,
+      h('button', { type: 'button', class: 'btn btn-plain', 'data-action': 'dismiss' }, icon('archive'), 'Archivia'),
+    ),
+    next.length
+      ? h(
+          'div',
+          { class: 'focus-next' },
+          h('p', { class: 'focus-next-label mono' }, 'Poi:'),
+          h(
+            'ul',
+            {},
+            next.map((n) =>
+              h(
+                'li',
+                {},
+                h(
+                  'button',
+                  { type: 'button', class: `next-row tone-${n.state}`, 'data-action': 'goto', 'data-key': n.key },
+                  light(n.state),
+                  h('span', { class: 'next-title' }, n.title),
+                  h('span', { class: 'sr-only' }, `, ${STATES[n.state].label.toLowerCase()} da `),
+                  h('span', { class: 'next-time mono', 'data-rel': 'elapsed', 'data-t': n.since }, elapsedText(now - n.since)),
+                ),
+              ),
+            ),
+          ),
+        )
+      : null,
+  );
+}
+
+// ---------- timeline ----------
+
+const TICKS = [0, 0.25, 0.5, 0.75, 1];
+
+/** Accessible summary of one lane, most recent first: "al lavoro da 24 min; prima da rivedere 2 h, …". */
+function laneSummary(lane, to) {
+  const segs = lane.segments;
+  const last = segs[segs.length - 1];
+  const name = (st) => STATES[st].span.toLowerCase();
+  const head = last.to >= to ? `${name(last.state)} da ${durationLong(to - last.from)}` : `${name(last.state)} ${durationLong(last.to - last.from)}, poi chiusa`;
+  const before = segs
+    .slice(0, -1)
+    .reverse()
+    .slice(0, 4)
+    .map((g) => `${name(g.state)} ${durationLong(g.to - g.from)}`);
+  return `${lane.title}: ${head}${before.length ? `; prima ${before.join(', ')}` : ''}.`;
+}
+
+/** The "Ultime 12 ore" chart: one lane per session, segments colored by state, gridlines every 3 h. */
+export function timelineView(t) {
+  const span = t.to - t.from;
+  const hours = Math.round(span / HOUR);
+  const pos = (ms) => ((ms - t.from) / span) * 100;
+  const tickLabel = (f) => (f === 1 ? 'ora' : `\u2212${Math.round(hours * (1 - f))} h`);
+
+  const lanes = t.lanes.map((lane) => {
+    const track = h('div', { class: 'lane-track', role: 'img', 'aria-label': laneSummary(lane, t.to) });
+    lane.segments.forEach((g, i) => {
+      const prev = lane.segments[i - 1];
+      const seg = h('span', {
+        class: `tl-seg mark-${g.state}${i === 0 ? ' is-start' : ''}${i === lane.segments.length - 1 ? ' is-end' : ''}${prev && prev.to >= g.from ? ' is-adjacent' : ''}`,
+        'data-tip': `${STATES[g.state].span} · ${clock(g.from)}–${clock(g.to)} (${durationLong(g.to - g.from)})`,
+      });
+      seg.style.left = `${pos(g.from)}%`;
+      seg.style.width = `${pos(g.to) - pos(g.from)}%`;
+      track.append(seg);
+    });
+    return h(
+      'li',
+      { class: `lane${lane.state === 'done' ? ' is-done' : ''}` },
+      h(
+        'button',
+        { type: 'button', class: `lane-label tone-${lane.state}`, 'data-action': 'goto', 'data-key': lane.key },
+        light(lane.state),
+        h('span', { class: 'lane-title' }, lane.title),
+      ),
+      track,
+    );
+  });
+
+  return h(
+    'div',
+    { class: 'tl' },
+    h(
+      'div',
+      { class: 'tl-axis mono', 'aria-hidden': 'true' },
+      h('span', { class: 'tl-axis-spacer' }),
+      h('span', { class: 'tl-ticks' }, TICKS.map((f) => h('span', { class: 'tl-tick', style: `left:${f * 100}%` }, tickLabel(f)))),
+    ),
+    h(
+      'div',
+      { class: 'tl-plot' },
+      h('div', { class: 'tl-grid', 'aria-hidden': 'true' }, TICKS.map((f) => h('span', { class: `tl-gridline${f === 1 ? ' is-now' : ''}`, style: `left:${f * 100}%` }))),
+      h('ol', { class: 'tl-lanes' }, lanes),
+    ),
+  );
+}
+
 /** Message text with line breaks kept; **bold** and `code` rendered, everything else literal. */
 function richText(text) {
   return text
@@ -201,11 +387,22 @@ function richText(text) {
     });
 }
 
-/** Re-renders every relative time under `root` against the given server-clock now. */
+/** Re-renders every relative time and wait meter under `root` against the given server-clock now. */
 export function refreshTimes(root, now) {
   for (const el of root.querySelectorAll('[data-rel]')) {
     const ms = now - Number(el.dataset.t);
     const text = el.dataset.rel === 'elapsed' ? elapsedText(ms) : el.dataset.rel === 'quiet' ? quietText(ms) : agoText(ms);
     if (el.textContent !== text) el.textContent = text;
+  }
+  for (const el of root.querySelectorAll('[data-wait]')) {
+    const v = waitValues(Number(el.dataset.wait), Number(el.dataset.max), now);
+    const caption = el.querySelector('.wait-caption');
+    if (caption.textContent === v.caption) continue;
+    caption.textContent = v.caption;
+    el.classList.toggle('is-over', v.over);
+    el.querySelector('.meter-fill').style.width = `${v.pct}%`;
+    const meter = el.querySelector('.meter');
+    meter.setAttribute('aria-valuenow', v.hours.toFixed(1));
+    meter.setAttribute('aria-valuetext', v.caption);
   }
 }

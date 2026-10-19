@@ -1,13 +1,29 @@
-// EvoFlow dashboard: login, polling, rendering, actions, diary.
+// EvoFlow dashboard: login, polling, the home (what to do now), the lists, actions, diary.
 
 import * as api from './api.js';
-import { buildCard, light, refreshTimes } from './cards.js';
+import { buildCard, buildFocus, light, refreshTimes, timelineView } from './cards.js';
 import { h, icon } from './dom.js';
-import { ATTENTION, STATES, STATE_ORDER, calmSummary, countPhrase, dateTime, freshnessText } from './format.js';
+import {
+  ATTENTION,
+  BAR_ORDER,
+  STATES,
+  STATE_ORDER,
+  calmSummary,
+  countPhrase,
+  dateTime,
+  duration,
+  durationLong,
+  freshnessText,
+  todoUnit,
+  workingPhrase,
+} from './format.js';
 
 const POLL_MS = 5_000;
 const MAX_BACKOFF_MS = 30_000;
 const STALE_MS = 20_000;
+const TIMELINE_HOURS = 12;
+/** The timeline is refetched this often, and at once whenever a session changes state. */
+const TIMELINE_MS = 30_000;
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -23,13 +39,24 @@ const ui = {
   liveLabel: $('live-label'),
   freshnessText: $('freshness-text'),
   offline: $('offline'),
+  main: $('main'),
   loading: $('loading'),
-  summary: $('summary'),
+  home: $('home'),
   summaryLive: $('summary-live'),
-  calm: $('calm'),
-  calmSub: $('calm-sub'),
+  todo: $('todo'),
+  todoNum: $('todo-num'),
+  todoUnit: $('todo-unit'),
+  todoSentence: $('todo-sentence'),
   tiles: $('tiles'),
+  bar: $('bar'),
+  barTotal: $('bar-total'),
+  focus: $('focus'),
+  timelineStat: $('timeline-stat'),
+  timelineBody: $('timeline-body'),
+  filterNote: $('filter-note'),
+  filterLabel: $('filter-label'),
   clearFilter: $('clear-filter'),
+  tip: $('tip'),
   empty: $('empty'),
   board: $('board'),
   colAttention: $('col-attention'),
@@ -62,14 +89,26 @@ const state = {
   /** Bumped by every mutation: a poll that started before it may carry stale state and is dropped. */
   mutationSeq: 0,
   mutations: 0,
+  /** The session shown on the "Adesso" card; "Dopo" moves it along the to-do queue. */
+  focusKey: null,
+  /** Last TimelineResponse, when it arrived, and the key:state map it was fetched for. */
+  timeline: null,
+  timelineAt: 0,
+  statesSig: '',
+};
+
+const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const setText = (el, text) => {
+  if (el.textContent !== text) el.textContent = text;
 };
 
 const serverNow = () => Date.now() + state.offset;
 
-// ---------- static structure: one list section and one status tile per state ----------
+// ---------- static structure: list sections, legend toggles, bar segments ----------
 
 const sections = {};
-const tiles = {};
+const legend = {};
+const segments = {};
 
 for (const st of STATE_ORDER) {
   const meta = STATES[st];
@@ -96,26 +135,44 @@ for (const st of STATE_ORDER) {
   const section = h('section', { class: `group group-${st}${ATTENTION.has(st) ? ' is-attention' : ''}`, 'aria-labelledby': title.id, hidden: true }, title, list);
   sections[st] = { section, list, count, toggle };
   (ATTENTION.has(st) ? ui.colAttention : ui.colRest).append(section);
+}
 
-  // Status board tile: light + big number + label; it is also the filter toggle for its state.
+// Legend of the status bar, in the bar's order; each item is also the filter toggle for its state.
+for (const st of BAR_ORDER) {
   const num = h('span', { class: 'tile-num' });
-  const tile = h(
+  const item = h(
     'button',
     { type: 'button', class: `tile tile-${st}`, 'aria-pressed': 'false' },
-    h('span', { class: 'tile-top' }, light(st, st === 'working' ? ' is-pulsing' : ''), h('span', { class: 'tile-label' }, meta.heading)),
+    light(st, st === 'working' ? ' is-pulsing' : ''),
+    h('span', { class: 'tile-label' }, STATES[st].heading),
     num,
   );
-  tile.addEventListener('click', () => setFilter(state.filter === st ? null : st));
-  tiles[st] = { tile, num };
-  ui.tiles.append(tile);
+  item.addEventListener('click', () => setFilter(state.filter === st ? null : st, { reveal: true }));
+  legend[st] = { item, num };
+  ui.tiles.append(item);
+  if (st === 'done') continue;
+  // Part-to-whole bar of the active sessions (done excluded). Pointer-only: the legend is its keyboard twin.
+  const seg = h('span', { class: `bar-seg mark-${st}`, 'data-state': st, hidden: true });
+  seg.addEventListener('click', (e) => {
+    setFilter(state.filter === st ? null : st, { reveal: true });
+    if (e.pointerType !== 'mouse') flashTip(seg);
+  });
+  segments[st] = seg;
+  ui.bar.append(seg);
 }
 ui.clearFilter.addEventListener('click', () => setFilter(null));
 ui.lostBtn.append(icon('compass'), h('span', {}, 'Mi sono perso'));
 
-function setFilter(st) {
+/** Filters the lists; `reveal` scrolls the filtered list into view when it is off screen. */
+function setFilter(st, { reveal = false } = {}) {
   state.filter = st;
   renderSummary();
   renderBoard();
+  if (!st || !reveal) return;
+  const target = sections[st].section;
+  if (target.getBoundingClientRect().top > window.innerHeight * 0.75) {
+    target.scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' });
+  }
 }
 
 // ---------- rendering ----------
@@ -124,41 +181,240 @@ function render() {
   const d = state.data;
   ui.loading.hidden = d != null;
   if (!d) {
-    ui.summary.hidden = ui.board.hidden = ui.empty.hidden = true;
+    ui.home.hidden = ui.board.hidden = ui.empty.hidden = ui.filterNote.hidden = true;
     return;
   }
   const empty = d.sessions.length === 0 && STATE_ORDER.every((st) => !d.counts[st]);
   ui.empty.hidden = !empty;
-  ui.summary.hidden = ui.board.hidden = empty;
+  ui.home.hidden = ui.board.hidden = empty;
   if (state.filter && !d.counts[state.filter]) state.filter = null;
   renderSummary();
+  renderFocus();
   renderBoard();
   updateTitle();
   updateFreshness();
 }
 
+/** What needs you, most urgent first: waiting (oldest first), then failed, then forgotten. */
+function todoQueue() {
+  const order = ['waiting', 'failed', 'forgotten'];
+  return order.flatMap((st) => state.data.sessions.filter((s) => s.state === st).sort((a, b) => a.since - b.since));
+}
+
+const todoCount = (counts) => (counts.waiting ?? 0) + (counts.failed ?? 0) + (counts.forgotten ?? 0);
+
+/** The hero: one big number (things to do) and the one or two truest facts behind it. */
+function renderTodo() {
+  const counts = state.data.counts;
+  const n = todoCount(counts);
+  ui.todo.classList.toggle('is-calm', n === 0);
+  setText(ui.todoNum, String(n));
+  setText(ui.todoUnit, todoUnit(n));
+  const facts = [];
+  if (n > 0) {
+    // Same priority as the "Adesso" queue: live waits first, then failures, then forgotten sessions.
+    const now = serverNow();
+    const age = (list) => {
+      const oldest = Math.max(...list.map((s) => now - s.since));
+      return oldest < 60_000 ? 'pochi secondi' : duration(oldest);
+    };
+    const waits = state.data.sessions.filter((s) => s.state === 'waiting');
+    const forgotten = state.data.sessions.filter((s) => s.state === 'forgotten');
+    if (waits.length) {
+      facts.push(`${waits.length === 1 ? 'Aspetta' : 'La più vecchia aspetta'} da ${age(waits)}`);
+    } else if (counts.failed) {
+      facts.push(counts.failed === 1 ? 'Una sessione è fallita' : `${counts.failed} sessioni fallite`);
+    } else {
+      facts.push(`${forgotten.length === 1 ? 'Ferma' : 'La più vecchia è ferma'} da ${age(forgotten)}`);
+    }
+    if (counts.working) facts.push(workingPhrase(counts.working));
+  } else {
+    facts.push(workingPhrase(counts.working ?? 0));
+    if (counts.review) facts.push(`${counts.review} da rivedere`);
+  }
+  // Each fact stays whole; the line may only wrap at a separator.
+  const text = facts.join(' · ');
+  if (ui.todoSentence.dataset.text === text) return;
+  ui.todoSentence.dataset.text = text;
+  ui.todoSentence.replaceChildren(...facts.flatMap((f, i) => [i ? ' · ' : '', h('span', { class: 'fact' }, f)]));
+}
+
 function renderSummary() {
   const counts = state.data.counts;
-  const attention = STATE_ORDER.filter((st) => ATTENTION.has(st) && counts[st] > 0);
-  const calm = attention.length === 0;
-  ui.calm.hidden = !calm;
-  ui.calmSub.textContent = calm ? calmSummary(counts) : '';
+  renderTodo();
 
-  for (const st of STATE_ORDER) {
-    const { tile, num } = tiles[st];
+  for (const st of BAR_ORDER) {
+    const { item, num } = legend[st];
     const n = counts[st] ?? 0;
-    num.textContent = String(n);
-    tile.setAttribute('aria-label', countPhrase(st, n));
-    tile.setAttribute('aria-pressed', String(state.filter === st));
+    setText(num, String(n));
+    item.setAttribute('aria-label', countPhrase(st, n));
+    item.setAttribute('aria-pressed', String(state.filter === st));
     // Nothing to filter at zero: dimmed and out of the tab order.
-    tile.disabled = n === 0;
-    tile.classList.toggle('is-zero', n === 0);
+    item.disabled = n === 0;
+    item.classList.toggle('is-zero', n === 0);
   }
-  ui.clearFilter.hidden = !state.filter;
 
-  const live = calm ? `Nessuno ti aspetta. ${calmSummary(counts)}` : attention.map((st) => countPhrase(st, counts[st])).join(', ');
-  if (ui.summaryLive.textContent !== live) ui.summaryLive.textContent = live;
+  // Status bar: widths proportional to counts, fixed order, outer ends rounded.
+  const active = BAR_ORDER.filter((st) => st !== 'done' && counts[st] > 0);
+  const total = active.reduce((sum, st) => sum + counts[st], 0);
+  for (const [st, seg] of Object.entries(segments)) {
+    const n = counts[st] ?? 0;
+    seg.hidden = n === 0;
+    seg.style.flexGrow = String(n);
+    seg.dataset.tip = countPhrase(st, n);
+    seg.classList.toggle('is-first', st === active[0]);
+    seg.classList.toggle('is-last', st === active[active.length - 1]);
+    seg.classList.toggle('is-dimmed', state.filter != null && state.filter !== st);
+  }
+  ui.bar.classList.toggle('is-empty', total === 0);
+  ui.bar.setAttribute(
+    'aria-label',
+    total ? `${total} ${total === 1 ? 'sessione attiva' : 'sessioni attive'}: ${active.map((st) => countPhrase(st, counts[st])).join(', ')}` : 'Nessuna sessione attiva',
+  );
+  setText(ui.barTotal, `${total} ${total === 1 ? 'attiva' : 'attive'}`);
+
+  ui.filterNote.hidden = !state.filter;
+  setText(ui.filterLabel, state.filter ? `Solo: ${STATES[state.filter].heading}` : '');
+
+  const n = todoCount(counts);
+  const attention = STATE_ORDER.filter((st) => ATTENTION.has(st) && counts[st] > 0);
+  setText(ui.summaryLive, n ? `${n} ${todoUnit(n)}: ${attention.map((st) => countPhrase(st, counts[st])).join(', ')}.` : `Tutto in ordine. ${calmSummary(counts)}`);
 }
+
+// ---------- "Adesso" focus card ----------
+
+let focusSig = '';
+
+function renderFocus() {
+  const queue = todoQueue();
+  if (!queue.length) {
+    ui.focus.hidden = true;
+    ui.focus.replaceChildren();
+    focusSig = '';
+    state.focusKey = null;
+    return;
+  }
+  let i = queue.findIndex((s) => s.key === state.focusKey);
+  if (i < 0) i = 0;
+  const s = queue[i];
+  state.focusKey = s.key;
+  const next = [1, 2].map((k) => queue[(i + k) % queue.length]).filter((n, j, all) => n.key !== s.key && all.indexOf(n) === j);
+  ui.focus.hidden = false;
+  const sig = JSON.stringify([s, next.map((n) => [n.key, n.state, n.title, n.since]), i, queue.length]);
+  if (sig === focusSig) return;
+  focusSig = sig;
+  const action = ui.focus.contains(document.activeElement) ? document.activeElement.dataset.action : null;
+  ui.focus.replaceChildren(buildFocus(s, { now: serverNow(), forgottenMs: state.data.config.forgottenMs, position: i + 1, total: queue.length, next }));
+  if (action) ui.focus.querySelector(`[data-action="${action}"]`)?.focus({ preventScroll: true });
+}
+
+ui.focus.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]');
+  const key = ui.focus.querySelector('.focus-card')?.dataset.key;
+  if (!el || !key) return;
+  const queue = todoQueue();
+  const i = queue.findIndex((s) => s.key === key);
+  const following = queue.length > 1 ? queue[(i + 1) % queue.length].key : null;
+  if (el.dataset.action === 'next') {
+    state.focusKey = following;
+    renderFocus();
+  } else if (el.dataset.action === 'dismiss') {
+    state.focusKey = following;
+    dismiss(key);
+  } else if (el.dataset.action === 'goto') {
+    gotoSession(el.dataset.key);
+  }
+});
+
+// ---------- timeline ----------
+
+let timelineInflight = false;
+
+async function refreshTimeline() {
+  if (!state.authed || timelineInflight) return;
+  timelineInflight = true;
+  try {
+    const t = await api.getTimeline(TIMELINE_HOURS);
+    if (!state.authed) return;
+    state.timeline = t;
+    state.timelineAt = Date.now();
+    renderTimeline();
+  } catch (err) {
+    if (err instanceof api.AuthError) showLogin();
+    // Otherwise keep showing the last timeline; the sessions poll reports connection problems.
+  } finally {
+    timelineInflight = false;
+  }
+}
+
+function renderTimeline() {
+  const t = state.timeline;
+  if (!t) return;
+  setText(ui.timelineStat, t.waiting_ms >= 60_000 ? `ti hanno aspettato ${durationLong(t.waiting_ms)}` : 'nessuna attesa');
+  const focused = ui.timelineBody.contains(document.activeElement) ? document.activeElement.dataset.key : null;
+  ui.timelineBody.replaceChildren(
+    t.lanes.length ? timelineView(t) : h('p', { class: 'timeline-empty' }, 'La cronologia appare quando arrivano gli eventi degli hook.'),
+  );
+  if (focused) ui.timelineBody.querySelector(`[data-key="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
+}
+
+ui.timelineBody.addEventListener('click', (e) => {
+  const lane = e.target.closest('[data-action="goto"]');
+  if (lane) return gotoSession(lane.dataset.key);
+  const seg = e.target.closest('[data-tip]');
+  if (seg && e.pointerType !== 'mouse') flashTip(seg);
+});
+
+/** From the focus card or a timeline lane to the session's row: shown, expanded, scrolled to, focused. */
+function gotoSession(key) {
+  const s = findSession(key);
+  if (!s) return;
+  if (state.filter && state.filter !== s.state) setFilter(null);
+  if (s.state === 'done') state.doneOpen = true;
+  state.expanded.add(key);
+  renderBoard();
+  const card = cardCache.get(key)?.el;
+  if (!card?.isConnected) return;
+  setExpanded(card, key, true);
+  card.scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' });
+  card.querySelector('[data-action="toggle"]').focus({ preventScroll: true });
+}
+
+// ---------- tooltip for chart marks ----------
+
+let tipTimer = 0;
+
+function showTip(el, x) {
+  const text = el.dataset.tip;
+  if (!text) return;
+  setText(ui.tip, text);
+  ui.tip.hidden = false;
+  const r = el.getBoundingClientRect();
+  const cx = x ?? r.left + r.width / 2;
+  const left = Math.min(window.innerWidth - ui.tip.offsetWidth - 8, Math.max(8, cx - ui.tip.offsetWidth / 2));
+  const above = r.top - ui.tip.offsetHeight - 8;
+  ui.tip.style.left = `${left}px`;
+  ui.tip.style.top = `${above < 8 ? r.bottom + 8 : above}px`;
+}
+
+const hideTip = () => {
+  ui.tip.hidden = true;
+};
+
+/** Touch has no hover: a tap shows the tooltip for a moment. */
+function flashTip(el) {
+  showTip(el);
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(hideTip, 2_500);
+}
+
+document.addEventListener('pointermove', (e) => {
+  if (e.pointerType !== 'mouse') return;
+  const el = e.target.closest?.('[data-tip]');
+  if (el) showTip(el, e.clientX);
+  else if (!ui.tip.hidden) hideTip();
+});
+window.addEventListener('scroll', hideTip, { passive: true });
 
 /** Card elements are reused while their session is unchanged, so focus and scroll survive each poll. */
 const cardCache = new Map();
@@ -168,7 +424,7 @@ function cardFor(s, now) {
   const sig = JSON.stringify(s) + (pending ? '|pending' : '');
   const hit = cardCache.get(s.key);
   if (hit?.sig === sig) return hit.el;
-  const el = buildCard(s, { now, expanded: state.expanded.has(s.key), pending });
+  const el = buildCard(s, { now, expanded: state.expanded.has(s.key), pending, forgottenMs: state.data.config.forgottenMs });
   cardCache.set(s.key, { sig, el });
   return el;
 }
@@ -279,11 +535,12 @@ if (window.visualViewport) {
   vv.addEventListener('scroll', syncKeyboard);
 }
 
-// Relative times move on their own between polls.
+// Relative times and wait meters move on their own between polls.
 setInterval(() => {
   if (!state.data || document.visibilityState !== 'visible') return;
   updateFreshness();
-  refreshTimes(ui.board, serverNow());
+  renderTodo();
+  refreshTimes(ui.main, serverNow());
 }, 1_000);
 
 // ---------- polling ----------
@@ -298,6 +555,12 @@ function apply(data) {
   state.receivedAt = Date.now();
   state.offset = data.now - state.receivedAt;
   render();
+  // The timeline follows the sessions: refetched when any state changes, otherwise every TIMELINE_MS.
+  const statesSig = data.sessions.map((s) => `${s.key}:${s.state}`).join('|');
+  if (statesSig !== state.statesSig || Date.now() - state.timelineAt > TIMELINE_MS) {
+    state.statesSig = statesSig;
+    refreshTimeline();
+  }
 }
 
 async function refresh() {
@@ -353,17 +616,16 @@ ui.board.addEventListener('click', (e) => {
   if (!card) return;
   const key = card.dataset.key;
   const action = e.target.closest('[data-action]')?.dataset.action;
-  if (action === 'toggle') return toggleCard(card, key);
+  if (action === 'toggle') return setExpanded(card, key, !state.expanded.has(key));
   if (action === 'dismiss') return dismiss(key);
   if (action === 'restore') return restore(key);
   // Anywhere else on the card toggles too, except inside controls, the details, or while selecting text.
   if (e.target.closest('a, button, .details')) return;
   if (window.getSelection()?.toString()) return;
-  toggleCard(card, key);
+  setExpanded(card, key, !state.expanded.has(key));
 });
 
-function toggleCard(card, key) {
-  const open = !state.expanded.has(key);
+function setExpanded(card, key, open) {
   if (open) state.expanded.add(key);
   else state.expanded.delete(key);
   card.classList.toggle('is-expanded', open);
@@ -518,8 +780,17 @@ function showLogin() {
   clearTimeout(timer);
   state.data = null;
   state.expanded.clear();
+  state.focusKey = null;
+  state.timeline = null;
+  state.timelineAt = 0;
+  state.statesSig = '';
+  focusSig = '';
   cardCache.clear();
   for (const { list } of Object.values(sections)) list.replaceChildren();
+  ui.focus.replaceChildren();
+  ui.timelineBody.replaceChildren();
+  setText(ui.timelineStat, '');
+  hideTip();
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   setOffline(false);
   document.title = 'EvoFlow';

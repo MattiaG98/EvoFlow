@@ -6,13 +6,17 @@ export const STATE_ORDER = ['waiting', 'failed', 'forgotten', 'review', 'working
 /** The states that need the user now. */
 export const ATTENTION = new Set(['waiting', 'failed', 'forgotten']);
 
+/** Order of the part-to-whole bar and its legend. Forgotten (indigo) must not sit next to review (blue): that pair fails CVD separation. */
+export const BAR_ORDER = ['waiting', 'forgotten', 'failed', 'review', 'working', 'done'];
+
 export const STATES = {
-  waiting: { label: 'Ti aspetta', heading: 'Ti aspettano', one: 'ti aspetta', many: 'ti aspettano', past: ['ti aspettava', 'ti aspettavano'] },
-  failed: { label: 'Fallita', heading: 'Fallite', one: 'fallita', many: 'fallite' },
-  forgotten: { label: 'Dimenticata', heading: 'Dimenticate', one: 'dimenticata', many: 'dimenticate' },
-  review: { label: 'Da rivedere', heading: 'Da rivedere', one: 'da rivedere', many: 'da rivedere' },
-  working: { label: 'Al lavoro', heading: 'Al lavoro', one: 'al lavoro', many: 'al lavoro' },
-  done: { label: 'Chiusa', heading: 'Chiuse', one: 'chiusa', many: 'chiuse' },
+  // `span`: the state as a stretch of time, for the timeline ("In attesa · 14:05–14:47").
+  waiting: { label: 'Ti aspetta', heading: 'Ti aspettano', one: 'ti aspetta', many: 'ti aspettano', past: ['ti aspettava', 'ti aspettavano'], span: 'In attesa' },
+  failed: { label: 'Fallita', heading: 'Fallite', one: 'fallita', many: 'fallite', span: 'Fallita' },
+  forgotten: { label: 'Dimenticata', heading: 'Dimenticate', one: 'dimenticata', many: 'dimenticate', span: 'Dimenticata' },
+  review: { label: 'Da rivedere', heading: 'Da rivedere', one: 'da rivedere', many: 'da rivedere', span: 'Da rivedere' },
+  working: { label: 'Al lavoro', heading: 'Al lavoro', one: 'al lavoro', many: 'al lavoro', span: 'Al lavoro' },
+  done: { label: 'Chiusa', heading: 'Chiuse', one: 'chiusa', many: 'chiuse', span: 'Chiusa' },
 };
 
 /** "1 fallita", "2 ti aspettano". */
@@ -22,10 +26,15 @@ export function countPhrase(state, n, { past = false } = {}) {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+/** "3 cose da fare" */
+export const todoUnit = (n) => (n === 1 ? 'cosa da fare' : 'cose da fare');
+
+/** "1 agente al lavoro", "Nessun agente al lavoro". */
+export const workingPhrase = (n) => (n === 0 ? 'Nessun agente al lavoro' : `${n} ${n === 1 ? 'agente' : 'agenti'} al lavoro`);
+
 /** The calm line shown when nobody needs the user. */
 export function calmSummary(counts) {
-  const working = counts.working ?? 0;
-  const parts = [working === 0 ? 'Nessun agente al lavoro.' : `${working} ${working === 1 ? 'agente' : 'agenti'} al lavoro.`];
+  const parts = [`${workingPhrase(counts.working ?? 0)}.`];
   if (counts.review) parts.push(`${counts.review} da rivedere.`);
   return parts.join(' ');
 }
@@ -51,6 +60,33 @@ export const elapsedText = (ms) => (ms < MIN ? 'adesso' : duration(ms));
 export const agoText = (ms) => (ms < MIN ? 'adesso' : `${duration(ms)} fa`);
 
 export const quietText = (ms) => `Nessun segnale da ${duration(ms)}`;
+
+/** "42 min", "3 h 10 min": a measured span, for tooltips and totals. */
+export function durationLong(ms) {
+  if (ms < MIN) return 'meno di 1 min';
+  if (ms < HOUR) return `${Math.floor(ms / MIN)} min`;
+  if (ms < DAY) {
+    const m = Math.floor((ms % HOUR) / MIN);
+    return `${Math.floor(ms / HOUR)} h${m ? ` ${m} min` : ''}`;
+  }
+  return duration(ms);
+}
+
+/**
+ * Wait meter caption: age toward the "forgotten" threshold.
+ * "da 2 h · dimenticata tra 46 h", or past it "da 3 giorni · dimenticata da 1 giorno".
+ */
+export function waitCaption(ageMs, forgottenMs) {
+  // Hours up to three days ("tra 46 h" reads better than "tra 1 giorno" against a 48 h threshold).
+  const span = (ms) => (ms >= HOUR && ms < 3 * DAY ? `${Math.floor(ms / HOUR)} h` : duration(ms));
+  const age = ageMs < MIN ? 'da adesso' : `da ${span(ageMs)}`;
+  return ageMs >= forgottenMs ? `${age} · dimenticata da ${span(ageMs - forgottenMs)}` : `${age} · dimenticata tra ${span(forgottenMs - ageMs)}`;
+}
+
+const CLOCK_FMT = new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' });
+
+/** "14:05" */
+export const clock = (ms) => CLOCK_FMT.format(new Date(ms));
 
 export function freshnessText(ms) {
   const s = Math.floor(ms / 1000);

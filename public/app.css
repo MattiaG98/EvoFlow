@@ -65,6 +65,15 @@
   --done-bg: rgb(142 142 147 / 0.14);
   --done-halo: rgb(142 142 147 / 0);
   --done-glow: rgb(142 142 147 / 0);
+
+  /* Chart marks (bar, timeline, meters): validated with the CVD palette checker against the surface.
+     Orange and green are under 3:1 on white, acceptable because every mark is also labelled in text. */
+  --mark-waiting: #ff9500;
+  --mark-forgotten: #5856d6;
+  --mark-failed: #ff3b30;
+  --mark-review: #007aff;
+  --mark-working: #34c759;
+  --mark-done: #8e8e93;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -124,6 +133,14 @@
     --done-bg: rgb(142 142 147 / 0.2);
     --done-halo: rgb(142 142 147 / 0);
     --done-glow: rgb(142 142 147 / 0);
+
+    /* Large fills use deeper steps; the bright system colors stay on the small glowing lights. */
+    --mark-waiting: #d97800;
+    --mark-forgotten: #5e5ce6;
+    --mark-failed: #ff453a;
+    --mark-review: #0a84ff;
+    --mark-working: #23a345;
+    --mark-done: #636366;
   }
 }
 
@@ -165,12 +182,19 @@ code { font-size: 0.88em; }
 }
 
 /* Each state sets the tone its light, tile, row and header use. */
-.light-waiting, .tile-waiting, .card-waiting, .group-waiting { --tone: var(--waiting); --tone-ink: var(--waiting-ink); --tone-bg: var(--waiting-bg); --tone-halo: var(--waiting-halo); --tone-glow: var(--waiting-glow); }
-.light-failed, .tile-failed, .card-failed, .group-failed { --tone: var(--failed); --tone-ink: var(--failed-ink); --tone-bg: var(--failed-bg); --tone-halo: var(--failed-halo); --tone-glow: var(--failed-glow); }
-.light-forgotten, .tile-forgotten, .card-forgotten, .group-forgotten { --tone: var(--forgotten); --tone-ink: var(--forgotten-ink); --tone-bg: var(--forgotten-bg); --tone-halo: var(--forgotten-halo); --tone-glow: var(--forgotten-glow); }
-.light-review, .tile-review, .card-review, .group-review { --tone: var(--review); --tone-ink: var(--review-ink); --tone-bg: var(--review-bg); --tone-halo: var(--review-halo); --tone-glow: var(--review-glow); }
-.light-working, .tile-working, .card-working, .group-working { --tone: var(--working); --tone-ink: var(--working-ink); --tone-bg: var(--working-bg); --tone-halo: var(--working-halo); --tone-glow: var(--working-glow); }
-.light-done, .tile-done, .card-done, .group-done { --tone: var(--done); --tone-ink: var(--done-ink); --tone-bg: var(--done-bg); --tone-halo: var(--done-halo); --tone-glow: var(--done-glow); }
+.light-waiting, .tile-waiting, .card-waiting, .group-waiting, .tone-waiting { --tone: var(--waiting); --tone-ink: var(--waiting-ink); --tone-bg: var(--waiting-bg); --tone-halo: var(--waiting-halo); --tone-glow: var(--waiting-glow); }
+.light-failed, .tile-failed, .card-failed, .group-failed, .tone-failed { --tone: var(--failed); --tone-ink: var(--failed-ink); --tone-bg: var(--failed-bg); --tone-halo: var(--failed-halo); --tone-glow: var(--failed-glow); }
+.light-forgotten, .tile-forgotten, .card-forgotten, .group-forgotten, .tone-forgotten { --tone: var(--forgotten); --tone-ink: var(--forgotten-ink); --tone-bg: var(--forgotten-bg); --tone-halo: var(--forgotten-halo); --tone-glow: var(--forgotten-glow); }
+.light-review, .tile-review, .card-review, .group-review, .tone-review { --tone: var(--review); --tone-ink: var(--review-ink); --tone-bg: var(--review-bg); --tone-halo: var(--review-halo); --tone-glow: var(--review-glow); }
+.light-working, .tile-working, .card-working, .group-working, .tone-working { --tone: var(--working); --tone-ink: var(--working-ink); --tone-bg: var(--working-bg); --tone-halo: var(--working-halo); --tone-glow: var(--working-glow); }
+.light-done, .tile-done, .card-done, .group-done, .tone-done { --tone: var(--done); --tone-ink: var(--done-ink); --tone-bg: var(--done-bg); --tone-halo: var(--done-halo); --tone-glow: var(--done-glow); }
+
+.mark-waiting { --mark: var(--mark-waiting); }
+.mark-forgotten { --mark: var(--mark-forgotten); }
+.mark-failed { --mark: var(--mark-failed); }
+.mark-review { --mark: var(--mark-review); }
+.mark-working { --mark: var(--mark-working); }
+.mark-done { --mark: var(--mark-done); }
 
 /* ---------- status light ---------- */
 
@@ -311,14 +335,9 @@ main { display: block; }
 .status-line.is-offline #live-label { color: var(--failed-ink); }
 .loading { padding: 28px 0; color: var(--ink-3); font-size: 15px; }
 
-/* ---------- status board ---------- */
+/* ---------- home: hero figure, legend, status bar ---------- */
 
-.summary { margin-top: 18px; }
-.calm { margin: 0 0 18px; }
-.calm-title { font-size: 22px; line-height: 28px; font-weight: 700; }
-.calm-sub { margin-top: 2px; color: var(--ink-2); font-size: 15px; }
-
-.section-head { display: flex; align-items: center; justify-content: space-between; min-height: 24px; padding: 0 4px 6px 16px; }
+.home { margin-top: 10px; }
 .section-label, .group-title {
   color: var(--ink-3);
   font-size: 13px;
@@ -327,48 +346,194 @@ main { display: block; }
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
-.section-head .text-btn { margin: -10px 0; font-size: 15px; }
 
-.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+/* The one big number per view: things to do. Proportional figures, not tabular. */
+.todo-figure { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 10px; }
+.todo-num { font-family: var(--rounded); font-size: 56px; line-height: 1; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+.todo-unit { font-size: 22px; line-height: 28px; font-weight: 600; }
+.todo-calm { display: none; align-items: center; gap: 12px; font-size: 28px; line-height: 34px; font-weight: 700; }
+.todo-calm .light { width: 12px; height: 12px; }
+.todo.is-calm .todo-figure { display: none; }
+.todo.is-calm .todo-calm { display: flex; }
+.todo-sentence { margin-top: 4px; color: var(--ink-2); font-size: 15px; line-height: 20px; }
+.todo-sentence .fact { white-space: nowrap; }
+
+/* Legend + filter toggles: light, label, count at body size. 36px pills with a 44px touch area. */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 6px; margin-top: 12px; }
 .tile {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-  min-height: 82px;
-  padding: 12px 14px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px 0 9px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 999px;
   background: var(--surface);
   color: var(--ink);
-  text-align: left;
+  font-size: 15px;
   cursor: pointer;
   touch-action: manipulation;
 }
-.tile-top { display: flex; align-items: center; gap: 9px; max-width: 100%; color: var(--tone-ink); font-size: 15px; font-weight: 600; }
-.tile-top .light { margin-left: 1px; }
-.tile-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tile-num { font-family: var(--rounded); font-size: 34px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
-/* The one that matters most: waiting gets a tinted tile; failures a red number. */
-.tile-waiting:not(.is-zero) { background-image: linear-gradient(var(--waiting-bg), var(--waiting-bg)); }
+.tile::after { content: ""; position: absolute; inset: -4px 0; }
+.tile .light { width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--tone-halo), 0 0 8px 0 var(--tone-glow); }
+.tile-label { color: var(--ink-2); white-space: nowrap; }
+.tile-num { font-weight: 700; font-variant-numeric: tabular-nums; }
 .tile-waiting:not(.is-zero) .tile-num { color: var(--waiting-ink); }
 .tile-failed:not(.is-zero) .tile-num { color: var(--failed-ink); }
-.tile.is-zero { cursor: default; }
-.tile.is-zero .tile-top, .tile.is-zero .tile-num { color: var(--ink-3); }
-.tile.is-zero .tile-num { font-weight: 600; }
+.tile.is-zero { cursor: default; background: transparent; }
+.tile.is-zero .tile-label, .tile.is-zero .tile-num { color: var(--ink-3); font-weight: 400; }
 .tile.is-zero .light { opacity: 0.35; box-shadow: none; animation: none; }
 .tile[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--tone-ink); }
 @media (hover: hover) {
-  .tile:not(:disabled):hover { background-color: var(--surface); filter: brightness(0.98); }
+  .tile:not(:disabled):hover { filter: brightness(0.97); }
 }
+
+/* Part-to-whole status bar: fixed order, 2px gaps (no strokes), 4px rounded outer ends, 44px hit area. */
+.statusbar { display: flex; align-items: center; gap: 12px; margin: -2px 0 -12px; }
+.bar { display: flex; flex: 1; align-items: center; gap: 2px; min-width: 0; height: 44px; }
+.bar.is-empty { border-radius: 4px; background: linear-gradient(var(--fill), var(--fill)) center / 100% 12px no-repeat; }
+.bar-seg { display: flex; flex: 1 1 0; align-items: center; min-width: 6px; height: 100%; cursor: pointer; }
+.bar-seg::before { content: ""; width: 100%; height: 12px; background: var(--mark); transition: opacity 0.2s; }
+.bar-seg.is-first::before { border-radius: 4px 0 0 4px; }
+.bar-seg.is-last::before { border-radius: 0 4px 4px 0; }
+.bar-seg.is-first.is-last::before { border-radius: 4px; }
+.bar-seg.is-dimmed::before { opacity: 0.3; }
+.bar-total { flex: none; color: var(--ink-3); font-size: 13px; }
+
+.tip {
+  position: fixed;
+  z-index: 60;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--hud);
+  color: var(--on-hud);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 16px;
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.2);
+}
+
+/* ---------- "Adesso" focus card ---------- */
+
+.focus { margin-top: 16px; }
+.focus-card { padding: 14px 16px 6px; border-radius: 16px; background: var(--surface); }
+.focus-eyebrow { display: flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: 12px; line-height: 16px; letter-spacing: 0.05em; text-transform: uppercase; }
+.focus-now { color: var(--ink); font-weight: 700; }
+.focus-state { color: var(--tone-ink); font-weight: 600; }
+.focus-pos { margin-left: auto; }
+.focus-title { margin-top: 8px; overflow: hidden; color: var(--ink-2); font-size: 15px; line-height: 20px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.focus-reason {
+  margin-top: 4px;
+  font-size: 21px;
+  line-height: 27px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.focus-card .activity { margin-top: 8px; }
+.focus-card > .wait, .focus-card > .wait-caption { margin-top: 12px; }
+.focus-card > .btn-filled { margin-top: 12px; }
+.focus-local { margin-top: 10px; }
+.focus-actions { display: flex; gap: 8px; margin-top: 8px; }
+.focus-actions .btn { flex: 1 1 0; }
+.btn-tinted { background: var(--fill); color: var(--accent); }
+.btn-tinted:hover:not(:disabled) { background: var(--fill-strong); }
+.focus-next { margin-top: 8px; border-top: 0.5px solid var(--line); }
+.focus-next-label { padding-top: 8px; color: var(--ink-3); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; }
+.focus-next ul { margin: 0; padding: 0; list-style: none; }
+.next-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.focus-next li + li .next-row { border-top: 0.5px solid var(--line); }
+.next-row .light { width: 8px; height: 8px; }
+.next-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.next-time { flex: none; color: var(--ink-3); font-size: 12px; }
+
+/* ---------- wait meter ---------- */
+
+.meter { height: 4px; border-radius: 2px; background: var(--waiting-bg); overflow: hidden; }
+.meter-fill { display: block; height: 100%; border-radius: 2px; background: var(--mark-waiting); }
+.wait.is-over .meter { background: var(--forgotten-bg); }
+.wait.is-over .meter-fill { background: var(--mark-forgotten); }
+.wait-focus .meter { height: 6px; border-radius: 3px; }
+.wait-caption { margin-top: 5px; color: var(--ink-3); font-size: 12px; line-height: 16px; }
+.wait-row { margin-top: 8px; max-width: 360px; }
+
+/* ---------- timeline ---------- */
+
+.timeline { margin-top: 24px; }
+.timeline-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 16px 7px; }
+.timeline-stat { color: var(--ink-2); font-size: 12px; text-align: right; }
+.timeline-body { padding: 12px 16px 14px; border-radius: 12px; background: var(--surface); }
+.timeline-empty { color: var(--ink-3); font-size: 15px; }
+.tl { --tl-label: 0px; --tl-gap: 0px; }
+.tl-axis { display: grid; grid-template-columns: var(--tl-label) minmax(0, 1fr); column-gap: var(--tl-gap); height: 16px; color: var(--ink-3); font-size: 11px; }
+.tl-ticks { position: relative; }
+.tl-tick { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.tl-tick:first-child { transform: none; }
+.tl-tick:last-child { transform: translateX(-100%); }
+.tl-plot { position: relative; margin-top: 6px; }
+.tl-grid { position: absolute; top: -4px; bottom: 0; left: calc(var(--tl-label) + var(--tl-gap)); right: 0; pointer-events: none; }
+.tl-gridline { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line); }
+.tl-gridline:first-child { border-left-color: transparent; }
+.tl-gridline.is-now { margin-left: -1.5px; border-left: 1.5px solid var(--ink-3); }
+.tl-lanes { position: relative; margin: 0; padding: 0; list-style: none; }
+.lane { padding: 3px 0 9px; }
+.lane-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 8px 0 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--surface); /* knocks the gridlines out behind the text */
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.lane-label::after { content: ""; position: absolute; inset: -8px 0 -14px; }
+.lane-label .light { width: 8px; height: 8px; }
+.lane-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane.is-done .lane-label { color: var(--ink-3); }
+.lane-track { position: relative; height: 10px; margin-top: 3px; }
+.tl-seg { position: absolute; top: 0; bottom: 0; min-width: 3px; background: var(--mark); background-clip: padding-box; }
+/* 2px surface gap between adjacent segments; rounded ends only at each lane's start and end. */
+.tl-seg.is-adjacent { border-left: 2px solid var(--surface); }
+.tl-seg.is-start { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+.tl-seg.is-end { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+.lane.is-done .tl-seg { opacity: 0.45; }
+
+/* ---------- filter note above the lists ---------- */
+
+.filter-note { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; padding: 0 4px 0 16px; color: var(--ink-2); font-size: 15px; }
+.filter-note + .board .group:first-child { margin-top: 8px; }
 
 /* ---------- inset grouped lists ---------- */
 
 .board { margin-top: 4px; }
-.group { margin-top: 24px; }
+.group { margin-top: 24px; scroll-margin-top: 64px; }
 .group-title { display: flex; align-items: center; gap: 6px; min-height: 18px; margin: 0 0 7px; padding: 0 16px; }
 .group-count { font-family: var(--mono); font-size: 12px; }
 .group-count::before { content: "· "; }
@@ -399,6 +564,7 @@ main { display: block; }
 
 .card {
   position: relative;
+  scroll-margin-top: 64px;
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr);
   column-gap: 12px;
@@ -676,7 +842,9 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); background: var(--backdrop, rgb
 @media (min-width: 768px) {
   .wrap { padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); }
   .hero { padding-top: 6px; }
-  .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  /* Home: hero, legend, bar and the focus card on the left; the timeline on the right. */
+  .home { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 24px; align-items: start; margin-top: 18px; }
+  .home > .timeline { margin-top: 0; }
   .board.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 24px; align-items: start; }
   /* One column only (filtered, or nothing in one half): let the groups flow side by side. */
   .board:not(.split) .col { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 24px; align-items: start; }
@@ -687,7 +855,12 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); background: var(--backdrop, rgb
 }
 
 @media (min-width: 1100px) {
-  .tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .home { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 0 32px; }
+  /* Wide timeline: titles in a left column (~30%), lanes on the right. */
+  .tl { --tl-label: 30%; --tl-gap: 12px; }
+  .lane { display: grid; grid-template-columns: var(--tl-label) minmax(0, 1fr); column-gap: var(--tl-gap); align-items: center; padding: 5px 0; }
+  .lane-track { margin-top: 0; }
+  .lane-label::after { inset: -8px 0; }
   .board.split { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 0 32px; }
 }
 
@@ -700,7 +873,7 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); background: var(--backdrop, rgb
 }
 
 @media (forced-colors: active) {
-  .light, .ctx-fill { background: CanvasText; forced-color-adjust: none; }
+  .light, .ctx-fill, .meter-fill, .bar-seg::before, .tl-seg { background: CanvasText; forced-color-adjust: none; }
   .tile[aria-pressed="true"] { outline: 3px solid Highlight; }
-  .cards, .tile, .field-row { border: 1px solid CanvasText; }
+  .cards, .tile, .field-row, .focus-card, .timeline-body { border: 1px solid CanvasText; }
 }

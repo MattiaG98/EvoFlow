@@ -61,25 +61,47 @@
 
       <p id="loading" class="loading">Carico le sessioni…</p>
 
-      <section id="summary" class="summary" aria-labelledby="summary-title" hidden>
-        <p id="summary-live" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-        <div id="calm" class="calm" hidden>
-          <p class="calm-title">Nessuno ti aspetta.</p>
-          <p id="calm-sub" class="calm-sub"></p>
+      <!-- Home: the overall state and the one thing to do now, then the last 12 hours. -->
+      <div id="home" class="home" hidden>
+        <div class="home-main">
+          <section id="summary" class="summary" aria-labelledby="summary-title">
+            <h2 id="summary-title" class="sr-only">Riepilogo</h2>
+            <p id="summary-live" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+            <!-- Hero figure: the number of things to do, or a calm "Tutto in ordine". -->
+            <div id="todo" class="todo">
+              <p class="todo-figure"><span id="todo-num" class="todo-num"></span> <span id="todo-unit" class="todo-unit"></span></p>
+              <p class="todo-calm"><span class="light light-working" aria-hidden="true"></span>Tutto in ordine</p>
+              <p id="todo-sentence" class="todo-sentence"></p>
+            </div>
+            <!-- Legend of the bar below, and the filter toggles for the lists. -->
+            <div id="tiles" class="legend" role="group" aria-label="Filtra per stato"></div>
+            <div class="statusbar">
+              <div id="bar" class="bar" role="img"></div>
+              <span id="bar-total" class="bar-total mono"></span>
+            </div>
+          </section>
+          <section id="focus" class="focus" aria-label="Adesso: la cosa più urgente" hidden></section>
         </div>
-        <div class="section-head">
-          <h2 id="summary-title" class="section-label">Stato</h2>
-          <button id="clear-filter" type="button" class="text-btn" hidden>Mostra tutte</button>
-        </div>
-        <!-- Status board: one tile per state, each a filter toggle. -->
-        <div id="tiles" class="tiles" role="group" aria-label="Filtra per stato"></div>
-      </section>
+
+        <section id="timeline" class="timeline" aria-labelledby="timeline-title">
+          <div class="timeline-head">
+            <h2 id="timeline-title" class="section-label">Ultime 12 ore</h2>
+            <p id="timeline-stat" class="timeline-stat mono"></p>
+          </div>
+          <div id="timeline-body" class="timeline-body"></div>
+        </section>
+      </div>
 
       <section id="empty" class="empty" aria-labelledby="empty-title" hidden>
         <h2 id="empty-title">Ancora nessuna sessione</h2>
         <p>Qui compaiono le tue sessioni Claude Code appena arrivano i primi eventi: succede dopo aver installato gli hook sulle macchine e nelle sessioni cloud che vuoi seguire.</p>
         <p>Le istruzioni sono nel repository, in <code>docs/SETUP.md</code>.</p>
       </section>
+
+      <div id="filter-note" class="filter-note" hidden>
+        <span id="filter-label"></span>
+        <button id="clear-filter" type="button" class="text-btn">Mostra tutte</button>
+      </div>
 
       <div id="board" class="board" hidden>
         <div id="col-attention" class="col"></div>
@@ -126,5 +148,7 @@
   </dialog>
 
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+  <!-- Shared tooltip for chart marks; every value it shows is also available as text. -->
+  <div id="tip" class="tip" role="tooltip" hidden></div>
 </body>
 </html>

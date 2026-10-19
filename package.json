@@ -1,0 +1,16 @@
+{
+  "name": "evoflow",
+  "private": true,
+  "type": "module",
+  "description": "Dashboard per tenere sott'occhio le sessioni Claude Code in parallelo, su telefono, iPad e desktop.",
+  "scripts": {
+    "dev": "node --disable-warning=ExperimentalWarning tools/dev.ts",
+    "test": "node --disable-warning=ExperimentalWarning --test 'tests/**/*.test.ts'",
+    "typecheck": "tsc --noEmit -p .",
+    "replay": "node tools/replay.ts",
+    "deploy": "npx wrangler deploy"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

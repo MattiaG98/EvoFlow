@@ -1,0 +1,24 @@
+name = "evoflow"
+main = "src/worker/index.ts"
+compatibility_date = "2025-09-15"
+
+# public/ is served as static files; anything else (the /api/* routes) runs the Worker.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# Create the database once (Cloudflare dashboard > Storage & Databases > D1 > Create, name "evoflow")
+# and paste its ID here. Tables are created automatically on the first request.
+[[d1_databases]]
+binding = "DB"
+database_name = "evoflow"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# Daily cleanup of the event log (kept 30 days).
+[triggers]
+crons = ["17 3 * * *"]
+
+# Secrets, set in the dashboard (Worker > Settings > Variables and Secrets) or with `npx wrangler secret put`:
+#   INGEST_TOKEN        shared with the hooks and the reconciliation task
+#   DASHBOARD_PASSWORD  to open the dashboard
+# Optional plain variable: FORGOTTEN_HOURS (default 48)

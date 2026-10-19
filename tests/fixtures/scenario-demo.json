@@ -1,0 +1,600 @@
+{
+ "description": "Demo: 5 sessioni via hook (lavoro, permesso, domanda, revisione, chiusa) + 4 note solo dallo snapshot (dimenticata, revisione vecchia, fallita, completata).",
+ "steps": [
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "cloud",
+     "entrypoint": "remote_mobile",
+     "host": "cloud",
+     "repo": "demo/shop-app",
+     "branch": "claude/checkout-refactor-x1y2",
+     "remote_session_id": "cse_01DemoWorkingAAAAAAAAAAA"
+    },
+    "payload": {
+     "session_id": "a1111111-0000-5000-8000-000000000001",
+     "hook_event_name": "SessionStart",
+     "cwd": "/home/user/shop-app",
+     "source": "startup"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "cloud",
+     "entrypoint": "remote_mobile",
+     "host": "cloud",
+     "repo": "demo/shop-app",
+     "branch": "claude/checkout-refactor-x1y2",
+     "remote_session_id": "cse_01DemoWorkingAAAAAAAAAAA"
+    },
+    "payload": {
+     "session_id": "a1111111-0000-5000-8000-000000000001",
+     "hook_event_name": "UserPromptSubmit",
+     "cwd": "/home/user/shop-app",
+     "prompt": "Rifattorizza il checkout per supportare il pagamento in 3 rate e aggiorna i test"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "cloud",
+     "entrypoint": "remote_mobile",
+     "host": "cloud",
+     "repo": "demo/shop-app",
+     "branch": "claude/checkout-refactor-x1y2",
+     "remote_session_id": "cse_01DemoWorkingAAAAAAAAAAA"
+    },
+    "payload": {
+     "session_id": "a1111111-0000-5000-8000-000000000001",
+     "hook_event_name": "PreToolUse",
+     "cwd": "/home/user/shop-app",
+     "tool_name": "Edit",
+     "tool_input": {
+      "file_path": "/home/user/shop-app/src/checkout/installments.ts"
+     }
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "cloud",
+     "entrypoint": "remote_mobile",
+     "host": "cloud",
+     "repo": "demo/shop-app",
+     "branch": "claude/checkout-refactor-x1y2",
+     "remote_session_id": "cse_01DemoWorkingAAAAAAAAAAA"
+    },
+    "payload": {
+     "session_id": "a1111111-0000-5000-8000-000000000001",
+     "hook_event_name": "PreToolUse",
+     "cwd": "/home/user/shop-app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test -- checkout",
+      "description": "Run checkout test suite"
+     }
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "cloud",
+     "entrypoint": "remote_web",
+     "host": "cloud",
+     "repo": "demo/api-server",
+     "branch": "claude/rate-limit-k8s9",
+     "remote_session_id": "cse_01DemoPermissionBBBBBBBB"
+    },
+    "payload": {
+     "session_id": "b2222222-0000-5000-8000-000000000002",
+     "hook_event_name": "SessionStart",
+     "cwd": "/home/user/api-server",
+     "source": "startup"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "cloud",
+     "entrypoint": "remote_web",
+     "host": "cloud",
+     "repo": "demo/api-server",
+     "branch": "claude/rate-limit-k8s9",
+     "remote_session_id": "cse_01DemoPermissionBBBBBBBB"
+    },
+    "payload": {
+     "session_id": "b2222222-0000-5000-8000-000000000002",
+     "hook_event_name": "UserPromptSubmit",
+     "cwd": "/home/user/api-server",
+     "prompt": "Aggiungi rate limiting alle API pubbliche e fai il deploy su staging"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "cloud",
+     "entrypoint": "remote_web",
+     "host": "cloud",
+     "repo": "demo/api-server",
+     "branch": "claude/rate-limit-k8s9",
+     "remote_session_id": "cse_01DemoPermissionBBBBBBBB"
+    },
+    "payload": {
+     "session_id": "b2222222-0000-5000-8000-000000000002",
+     "hook_event_name": "PreToolUse",
+     "cwd": "/home/user/api-server",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "./deploy.sh staging",
+      "description": "Deploy to staging"
+     }
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "cloud",
+     "entrypoint": "remote_web",
+     "host": "cloud",
+     "repo": "demo/api-server",
+     "branch": "claude/rate-limit-k8s9",
+     "remote_session_id": "cse_01DemoPermissionBBBBBBBB"
+    },
+    "payload": {
+     "session_id": "b2222222-0000-5000-8000-000000000002",
+     "hook_event_name": "Notification",
+     "cwd": "/home/user/api-server",
+     "message": "Claude needs your permission to use Bash",
+     "notification_type": "permission_prompt"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "local",
+     "entrypoint": "claude-desktop",
+     "host": "MacBook-Pro",
+     "repo": "demo/landing",
+     "branch": "feature/hero-copy"
+    },
+    "payload": {
+     "session_id": "c3333333-0000-4000-8000-000000000003",
+     "hook_event_name": "SessionStart",
+     "cwd": "/home/user/landing",
+     "source": "startup"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "local",
+     "entrypoint": "claude-desktop",
+     "host": "MacBook-Pro",
+     "repo": "demo/landing",
+     "branch": "feature/hero-copy"
+    },
+    "payload": {
+     "session_id": "c3333333-0000-4000-8000-000000000003",
+     "hook_event_name": "UserPromptSubmit",
+     "cwd": "/home/user/landing",
+     "prompt": "Proponi tre varianti per il titolo della hero section"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "local",
+     "entrypoint": "claude-desktop",
+     "host": "MacBook-Pro",
+     "repo": "demo/landing",
+     "branch": "feature/hero-copy"
+    },
+    "payload": {
+     "session_id": "c3333333-0000-4000-8000-000000000003",
+     "hook_event_name": "Stop",
+     "cwd": "/home/user/landing",
+     "last_assistant_message": "Ho preparato tre varianti in `src/hero.tsx`:\n\n1. **Il tuo tempo, finalmente tuo**\n2. **Meno caos, più lavoro fatto**\n3. **Tutto sotto controllo, ovunque**\n\nQuale preferisci che metta in produzione?"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "cloud",
+     "entrypoint": "remote_mobile",
+     "host": "cloud",
+     "repo": "demo/mobile",
+     "branch": "claude/offline-sync-p3q4",
+     "remote_session_id": "cse_01DemoReviewDDDDDDDDDDDD"
+    },
+    "payload": {
+     "session_id": "d4444444-0000-5000-8000-000000000004",
+     "hook_event_name": "SessionStart",
+     "cwd": "/home/user/mobile",
+     "source": "startup"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "cloud",
+     "entrypoint": "remote_mobile",
+     "host": "cloud",
+     "repo": "demo/mobile",
+     "branch": "claude/offline-sync-p3q4",
+     "remote_session_id": "cse_01DemoReviewDDDDDDDDDDDD"
+    },
+    "payload": {
+     "session_id": "d4444444-0000-5000-8000-000000000004",
+     "hook_event_name": "UserPromptSubmit",
+     "cwd": "/home/user/mobile",
+     "prompt": "Implementa la sincronizzazione offline delle note"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "cloud",
+     "entrypoint": "remote_mobile",
+     "host": "cloud",
+     "repo": "demo/mobile",
+     "branch": "claude/offline-sync-p3q4",
+     "remote_session_id": "cse_01DemoReviewDDDDDDDDDDDD"
+    },
+    "payload": {
+     "session_id": "d4444444-0000-5000-8000-000000000004",
+     "hook_event_name": "Stop",
+     "cwd": "/home/user/mobile",
+     "last_assistant_message": "Sincronizzazione offline implementata: coda locale in IndexedDB, retry esponenziale, risoluzione conflitti last-write-wins. 14 test nuovi, tutti verdi. PR #12 aperta."
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "local",
+     "entrypoint": "cli",
+     "host": "MacBook-Pro",
+     "repo": "demo/scripts",
+     "branch": "main"
+    },
+    "payload": {
+     "session_id": "e5555555-0000-4000-8000-000000000005",
+     "hook_event_name": "SessionStart",
+     "cwd": "/home/user/scripts",
+     "source": "startup"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "local",
+     "entrypoint": "cli",
+     "host": "MacBook-Pro",
+     "repo": "demo/scripts",
+     "branch": "main"
+    },
+    "payload": {
+     "session_id": "e5555555-0000-4000-8000-000000000005",
+     "hook_event_name": "UserPromptSubmit",
+     "cwd": "/home/user/scripts",
+     "prompt": "Rinomina i file della cartella export con la data in testa"
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "local",
+     "entrypoint": "cli",
+     "host": "MacBook-Pro",
+     "repo": "demo/scripts",
+     "branch": "main"
+    },
+    "payload": {
+     "session_id": "e5555555-0000-4000-8000-000000000005",
+     "hook_event_name": "Stop",
+     "cwd": "/home/user/scripts",
+     "last_assistant_message": "Fatto: 42 file rinominati."
+    }
+   }
+  },
+  {
+   "delay_ms": 150,
+   "event": {
+    "v": 1,
+    "meta": {
+     "source": "local",
+     "entrypoint": "cli",
+     "host": "MacBook-Pro",
+     "repo": "demo/scripts",
+     "branch": "main"
+    },
+    "payload": {
+     "session_id": "e5555555-0000-4000-8000-000000000005",
+     "hook_event_name": "SessionEnd",
+     "cwd": "/home/user/scripts",
+     "reason": "prompt_input_exit"
+    }
+   }
+  },
+  {
+   "delay_ms": 300,
+   "snapshot": [
+    {
+     "id": "session_01DemoForgottenFFFFFFFF",
+     "title": "Pantry app: test in locale",
+     "status_bucket": "SESSION_STATUS_BUCKET_BLOCKED",
+     "updated_hours_ago": 960,
+     "created_hours_ago": 980,
+     "origin": "web_claude_ai",
+     "unread": false,
+     "session_context": {
+      "sources": [
+       {
+        "git_repository": {
+         "url": "https://github.com/demo/pantry"
+        }
+       }
+      ],
+      "outcomes": [
+       {
+        "git_repository": {
+         "git_info": {
+          "repo": "demo/pantry",
+          "branches": [
+           "claude/pantry-app-t7"
+          ]
+         }
+        }
+       }
+      ]
+     },
+     "post_turn_summary": {
+      "status_category": "need_input",
+      "status_detail": "in attesa dei risultati dei test in locale",
+      "needs_action": "esegui npm install, typecheck e test, poi riportami eventuali errori",
+      "recent_action": ""
+     },
+     "external_metadata": {
+      "context_usage": {
+       "used_tokens": 290000,
+       "max_tokens": 1000000
+      },
+      "usage": {
+       "cost_usd": 5.6
+      }
+     }
+    },
+    {
+     "id": "session_01DemoOldReviewGGGGGGGG",
+     "title": "Piattaforma tool analitici",
+     "status_bucket": "SESSION_STATUS_BUCKET_REVIEW_READY",
+     "updated_hours_ago": 77,
+     "created_hours_ago": 97,
+     "origin": "web_claude_ai",
+     "unread": true,
+     "session_context": {
+      "sources": [
+       {
+        "git_repository": {
+         "url": "https://github.com/demo/analytics"
+        }
+       }
+      ],
+      "outcomes": [
+       {
+        "git_repository": {
+         "git_info": {
+          "repo": "demo/analytics",
+          "branches": [
+           "claude/tools-platform-g6"
+          ]
+         }
+        }
+       }
+      ]
+     },
+     "post_turn_summary": {
+      "status_category": "review_ready",
+      "status_detail": "spiegato il formato wheel: artefatti immutabili, installazione veloce",
+      "needs_action": "",
+      "recent_action": ""
+     },
+     "external_metadata": {
+      "context_usage": {
+       "used_tokens": 140000,
+       "max_tokens": 1000000
+      },
+      "usage": {
+       "cost_usd": 11.3
+      }
+     }
+    },
+    {
+     "id": "session_01DemoFailedHHHHHHHHHHH",
+     "title": "Migrazione database v2",
+     "status_bucket": "SESSION_STATUS_BUCKET_FAILED",
+     "updated_hours_ago": 3,
+     "created_hours_ago": 23,
+     "origin": "ios",
+     "unread": false,
+     "session_context": {
+      "sources": [
+       {
+        "git_repository": {
+         "url": "https://github.com/demo/api-server"
+        }
+       }
+      ],
+      "outcomes": [
+       {
+        "git_repository": {
+         "git_info": {
+          "repo": "demo/api-server",
+          "branches": [
+           "claude/db-migration-v2"
+          ]
+         }
+        }
+       }
+      ]
+     },
+     "post_turn_summary": {
+      "status_category": "failed",
+      "status_detail": "il turno si è interrotto: limite di contesto raggiunto durante la migrazione",
+      "needs_action": "",
+      "recent_action": ""
+     },
+     "external_metadata": {
+      "context_usage": {
+       "used_tokens": 990000,
+       "max_tokens": 1000000
+      },
+      "usage": {
+       "cost_usd": 18.9
+      }
+     }
+    },
+    {
+     "id": "session_01DemoDoneIIIIIIIIIIIII",
+     "title": "Regole del gioco di carte v1.1",
+     "status_bucket": "SESSION_STATUS_BUCKET_COMPLETED",
+     "updated_hours_ago": 144,
+     "created_hours_ago": 164,
+     "origin": "ios",
+     "unread": false,
+     "session_context": {
+      "sources": [
+       {
+        "git_repository": {
+         "url": "https://github.com/demo/cardgame"
+        }
+       }
+      ],
+      "outcomes": [
+       {
+        "git_repository": {
+         "git_info": {
+          "repo": "demo/cardgame",
+          "branches": [
+           "claude/rules-v11"
+          ]
+         }
+        }
+       }
+      ]
+     },
+     "post_turn_summary": {
+      "status_category": "completed",
+      "status_detail": "PR #33 unita e pubblicata",
+      "needs_action": "",
+      "recent_action": ""
+     },
+     "external_metadata": {
+      "context_usage": {
+       "used_tokens": 200000,
+       "max_tokens": 1000000
+      },
+      "usage": {
+       "cost_usd": 27.0
+      }
+     }
+    },
+    {
+     "id": "session_01DemoWorkingAAAAAAAAAAA",
+     "title": "Checkout a rate",
+     "status_bucket": "SESSION_STATUS_BUCKET_WORKING",
+     "updated_hours_ago": 0.1,
+     "created_hours_ago": 20.1,
+     "origin": "ios",
+     "unread": false,
+     "session_context": {
+      "sources": [
+       {
+        "git_repository": {
+         "url": "https://github.com/demo/shop-app"
+        }
+       }
+      ],
+      "outcomes": [
+       {
+        "git_repository": {
+         "git_info": {
+          "repo": "demo/shop-app",
+          "branches": [
+           "claude/checkout-refactor-x1y2"
+          ]
+         }
+        }
+       }
+      ]
+     },
+     "post_turn_summary": {
+      "status_category": "working",
+      "status_detail": "aggiornamento dei test del checkout",
+      "needs_action": "",
+      "recent_action": ""
+     },
+     "external_metadata": {
+      "context_usage": {
+       "used_tokens": 310000,
+       "max_tokens": 1000000
+      },
+      "usage": {
+       "cost_usd": 2.1
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

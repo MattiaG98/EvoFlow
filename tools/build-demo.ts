@@ -20,6 +20,7 @@ const MODULES: [key: string, path: string][] = [
   ['dom', 'public/dom.js'],
   ['format', 'public/format.js'],
   ['cards', 'public/cards.js'],
+  ['charts', 'public/charts.js'],
   ['api', 'tools/demo/mock-api.js'],
   ['app', 'public/app.js'],
 ];

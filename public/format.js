@@ -83,6 +83,20 @@ export function waitCaption(ageMs, forgottenMs) {
   return ageMs >= forgottenMs ? `${age} · dimenticata da ${span(ageMs - forgottenMs)}` : `${age} · dimenticata tra ${span(forgottenMs - ageMs)}`;
 }
 
+/** "2,8 h", "35 min": compact value labels on chart marks. */
+export function hoursCompact(ms) {
+  if (ms < HOUR) return `${Math.round(ms / MIN)} min`;
+  return `${String(Math.round((ms / HOUR) * 10) / 10).replace('.', ',')} h`;
+}
+
+/** "3 h 10 min", "0 min": a total for charts, where zero is a real value. */
+export const durationTotal = (ms) => (ms < MIN ? '0 min' : durationLong(ms));
+
+const DAY_FMT = new Intl.DateTimeFormat('it-IT', { weekday: 'short', day: 'numeric' });
+
+/** "lun 14" */
+export const dayLabel = (ms) => DAY_FMT.format(new Date(ms));
+
 const CLOCK_FMT = new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' });
 
 /** "14:05" */
@@ -145,4 +159,25 @@ export function localizeReason(text) {
     if (m) return fn(m);
   }
   return text;
+}
+
+// ---------- projects ----------
+
+export const NO_REPO_NAME = 'Senza repository';
+
+/**
+ * Display names for repositories: the last path segment ("api-server"), or the full "owner/repo" when two
+ * projects share a short name. `owner` is shown beside the name when it fits.
+ */
+export function projectNames(repos) {
+  const short = (r) => r.split('/').pop();
+  const seen = new Map();
+  for (const r of repos) seen.set(short(r), (seen.get(short(r)) ?? 0) + 1);
+  return new Map(
+    repos.map((r) => {
+      const name = short(r);
+      const owner = r.includes('/') ? r.slice(0, r.lastIndexOf('/')) : '';
+      return [r, seen.get(name) > 1 ? { name: r, owner: '' } : { name, owner }];
+    }),
+  );
 }

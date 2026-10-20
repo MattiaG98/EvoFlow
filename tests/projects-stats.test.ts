@@ -22,11 +22,19 @@ function plan(rows: ProjectRow[], sessions: ReturnType<typeof session>[], now = 
   return { slots: out.slots, rows: [...byRepo.values()], changed: out.changed };
 }
 
-test('active projects get distinct colors; the fifth gets a neutral band', () => {
-  const repos = ['a/one', 'a/two', 'a/three', 'a/four', 'a/five'];
+test('active projects get distinct colors; the fourth gets a neutral band', () => {
+  const repos = ['a/one', 'a/two', 'a/three', 'a/four'];
   const { slots } = plan([], repos.map((r, i) => session(`s${i}`, r, { last_event_at: NOW - i * 60_000 })));
-  assert.deepEqual(Object.values(slots).filter((s) => s != null).sort(), [0, 1, 2, 3]);
-  assert.equal(slots['a/five'], null, 'least recently active project folds to neutral');
+  assert.deepEqual(Object.values(slots).filter((s) => s != null).sort(), [0, 1, 2]);
+  assert.equal(slots['a/four'], null, 'least recently active project folds to neutral');
+});
+
+test('projects with something to do get the colors first', () => {
+  const working = ['a/w1', 'a/w2', 'a/w3'].map((r, i) => session(`w${i}`, r, { last_event_at: NOW - i * 60_000 }));
+  const waiting = session('q', 'a/asks', { last_event: 'Notification', last_event_at: NOW - 3 * H });
+  const { slots } = plan([], [...working, waiting]);
+  assert.notEqual(slots['a/asks'], null, 'the project waiting on you is colored even though it is the least recent');
+  assert.equal(Object.values(slots).filter((s) => s == null).length, 1);
 });
 
 test('a color follows its project: new projects never repaint existing ones', () => {
@@ -42,14 +50,14 @@ test('a color follows its project: new projects never repaint existing ones', ()
 });
 
 test('a project idle for two weeks gives its color up, and never shares it when it returns', () => {
-  const full = ['a/one', 'a/two', 'a/three', 'a/four'];
+  const full = ['a/one', 'a/two', 'a/three'];
   let state = plan([], full.map((r, i) => session(`s${i}`, r)));
   const later = NOW + 15 * DAY;
-  // Only three are still active; a new project takes the idle one's slot.
+  // Only two are still active; a new project takes the idle one's slot.
   state = plan(state.rows, [...full.slice(1).map((r, i) => session(`t${i}`, r)), session('n', 'a/new')], later);
   assert.equal(state.slots['a/new'], 0);
   assert.equal(state.slots['a/one'], null);
-  // The old project comes back while all four slots are held: it stays neutral rather than clash.
+  // The old project comes back while all three slots are held: it stays neutral rather than clash.
   state = plan(state.rows, [...full.map((r, i) => session(`u${i}`, r)), session('n', 'a/new')], later + H);
   const colored = Object.values(state.slots).filter((s) => s != null);
   assert.equal(colored.length, new Set(colored).size);

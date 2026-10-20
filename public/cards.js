@@ -1,16 +1,14 @@
-// DOM builders for the home and the lists: session rows, the "Adesso" focus card, the wait meter and
-// the 12-hour timeline. Pure construction: behaviour lives in app.js (delegated clicks on data-action).
+// DOM builders for sessions: list rows, the "Adesso" focus card, the wait meter and the topic band.
+// Pure construction: behaviour lives in app.js (delegated clicks on data-action).
 // A session row keeps the class `card` for scripts and tests.
 
-import { h, icon } from './dom.js';
+import { h, icon, light, swatch } from './dom.js';
 import {
   ATTENTION,
   STATES,
   agoText,
-  clock,
   contextPercent,
   device,
-  durationLong,
   elapsedText,
   localizeReason,
   money,
@@ -23,8 +21,34 @@ const CONTEXT_WARN = 80;
 /** Stable, attribute-safe id fragment for a session key. */
 const domId = (key) => `s-${key.replace(/[^\w-]/g, '_')}`;
 
-/** The status light: decorative, the row's state label carries the meaning in text. */
-export const light = (state, extra = '') => h('span', { class: `light light-${state}${extra}`, 'aria-hidden': 'true' });
+/**
+ * Topic band: which project a session belongs to. A tinted strip with a 3px top edge in the project color,
+ * a swatch, and the project's name written in text tokens; the name is the project filter toggle.
+ * @param topic  { key, slot, name, owner } from app.js
+ */
+export function band(topic, pressed = false) {
+  return h(
+    'div',
+    { class: `band topic-${topic.slot ?? 'none'}` },
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'band-btn',
+        'data-action': 'project',
+        'data-repo': topic.key,
+        'aria-pressed': String(pressed),
+        'aria-label': `Progetto ${topic.name}${topic.owner ? ` di ${topic.owner}` : ''}: mostra solo questo progetto`,
+      },
+      swatch(topic.slot),
+      h('span', { class: 'band-name' }, topic.name),
+      topic.owner ? h('span', { class: 'band-owner' }, topic.owner) : null,
+    ),
+  );
+}
+
+/** Small project chip for compact rows: swatch + short name in secondary text. */
+const projectChip = (topic) => h('span', { class: 'project-chip' }, swatch(topic.slot), h('span', {}, topic.name));
 
 /**
  * @param s  a DerivedSession from GET /api/sessions
@@ -32,8 +56,9 @@ export const light = (state, extra = '') => h('span', { class: `light light-${st
  * @param opts.expanded  details open
  * @param opts.pending   an archive/restore request for it is in flight
  * @param opts.forgottenMs  the "forgotten" threshold, for the wait meter
+ * @param opts.topic     the session's project, for the band
  */
-export function buildCard(s, { now, expanded, pending, forgottenMs }) {
+export function buildCard(s, { now, expanded, pending, forgottenMs, topic }) {
   const meta = STATES[s.state] ?? STATES.review;
   const id = domId(s.key);
   const dev = device(s.entrypoint, s.source);
@@ -47,6 +72,7 @@ export function buildCard(s, { now, expanded, pending, forgottenMs }) {
       'data-key': s.key,
       'aria-labelledby': `${id}-title`,
     },
+    band(topic),
     light(s.state, s.state === 'working' && !s.quiet ? ' is-pulsing' : ''),
     h(
       'div',
@@ -246,8 +272,9 @@ export function waitMeter(s, forgottenMs, now, size = 'row') {
  * The single most urgent session, large: what it asks, how long it has waited, and what to do.
  * @param opts.position  1-based index in the to-do queue; opts.total its length
  * @param opts.next      up to two sessions that come after it
+ * @param opts.topicOf   repo -> project, for the band and the "Poi" chips
  */
-export function buildFocus(s, { now, forgottenMs, position, total, next }) {
+export function buildFocus(s, { now, forgottenMs, position, total, next, topicOf }) {
   const dev = device(s.entrypoint, s.source);
   const reason = s.reason ? localizeReason(s.reason) : '';
   const open = s.url
@@ -256,6 +283,7 @@ export function buildFocus(s, { now, forgottenMs, position, total, next }) {
   return h(
     'div',
     { class: `focus-card tone-${s.state}`, 'data-key': s.key },
+    band(topicOf(s.repo)),
     h(
       'p',
       { class: 'focus-eyebrow mono' },
@@ -296,6 +324,7 @@ export function buildFocus(s, { now, forgottenMs, position, total, next }) {
                   { type: 'button', class: `next-row tone-${n.state}`, 'data-action': 'goto', 'data-key': n.key },
                   light(n.state),
                   h('span', { class: 'next-title' }, n.title),
+                  projectChip(topicOf(n.repo)),
                   h('span', { class: 'sr-only' }, `, ${STATES[n.state].label.toLowerCase()} da `),
                   h('span', { class: 'next-time mono', 'data-rel': 'elapsed', 'data-t': n.since }, elapsedText(now - n.since)),
                 ),
@@ -304,74 +333,6 @@ export function buildFocus(s, { now, forgottenMs, position, total, next }) {
           ),
         )
       : null,
-  );
-}
-
-// ---------- timeline ----------
-
-const TICKS = [0, 0.25, 0.5, 0.75, 1];
-
-/** Accessible summary of one lane, most recent first: "al lavoro da 24 min; prima da rivedere 2 h, …". */
-function laneSummary(lane, to) {
-  const segs = lane.segments;
-  const last = segs[segs.length - 1];
-  const name = (st) => STATES[st].span.toLowerCase();
-  const head = last.to >= to ? `${name(last.state)} da ${durationLong(to - last.from)}` : `${name(last.state)} ${durationLong(last.to - last.from)}, poi chiusa`;
-  const before = segs
-    .slice(0, -1)
-    .reverse()
-    .slice(0, 4)
-    .map((g) => `${name(g.state)} ${durationLong(g.to - g.from)}`);
-  return `${lane.title}: ${head}${before.length ? `; prima ${before.join(', ')}` : ''}.`;
-}
-
-/** The "Ultime 12 ore" chart: one lane per session, segments colored by state, gridlines every 3 h. */
-export function timelineView(t) {
-  const span = t.to - t.from;
-  const hours = Math.round(span / HOUR);
-  const pos = (ms) => ((ms - t.from) / span) * 100;
-  const tickLabel = (f) => (f === 1 ? 'ora' : `\u2212${Math.round(hours * (1 - f))} h`);
-
-  const lanes = t.lanes.map((lane) => {
-    const track = h('div', { class: 'lane-track', role: 'img', 'aria-label': laneSummary(lane, t.to) });
-    lane.segments.forEach((g, i) => {
-      const prev = lane.segments[i - 1];
-      const seg = h('span', {
-        class: `tl-seg mark-${g.state}${i === 0 ? ' is-start' : ''}${i === lane.segments.length - 1 ? ' is-end' : ''}${prev && prev.to >= g.from ? ' is-adjacent' : ''}`,
-        'data-tip': `${STATES[g.state].span} · ${clock(g.from)}–${clock(g.to)} (${durationLong(g.to - g.from)})`,
-      });
-      seg.style.left = `${pos(g.from)}%`;
-      seg.style.width = `${pos(g.to) - pos(g.from)}%`;
-      track.append(seg);
-    });
-    return h(
-      'li',
-      { class: `lane${lane.state === 'done' ? ' is-done' : ''}` },
-      h(
-        'button',
-        { type: 'button', class: `lane-label tone-${lane.state}`, 'data-action': 'goto', 'data-key': lane.key },
-        light(lane.state),
-        h('span', { class: 'lane-title' }, lane.title),
-      ),
-      track,
-    );
-  });
-
-  return h(
-    'div',
-    { class: 'tl' },
-    h(
-      'div',
-      { class: 'tl-axis mono', 'aria-hidden': 'true' },
-      h('span', { class: 'tl-axis-spacer' }),
-      h('span', { class: 'tl-ticks' }, TICKS.map((f) => h('span', { class: 'tl-tick', style: `left:${f * 100}%` }, tickLabel(f)))),
-    ),
-    h(
-      'div',
-      { class: 'tl-plot' },
-      h('div', { class: 'tl-grid', 'aria-hidden': 'true' }, TICKS.map((f) => h('span', { class: `tl-gridline${f === 1 ? ' is-now' : ''}`, style: `left:${f * 100}%` }))),
-      h('ol', { class: 'tl-lanes' }, lanes),
-    ),
   );
 }
 

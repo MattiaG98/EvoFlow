@@ -1,15 +1,17 @@
 import type { DerivedSession } from './types.ts';
 
 /**
- * Topic colors: four hues, chosen away from the state colors and validated as distinguishable in every pair
- * (more than four cannot be). Projects past the fourth get a neutral band; the name is always written on it.
+ * Topic colors: three hues, validated (dataviz checks, both themes) as distinguishable from each other and from
+ * every state color; a fourth cannot clear those floors. Projects past the third get a neutral band.
+ * The name is always written on the band, which the colorblind margins rely on.
  */
-export const PROJECT_SLOTS = 4;
+export const PROJECT_SLOTS = 3;
 
 /** A project keeps its color while it has been active within this window, even with no session open right now. */
 const HOLD_MS = 14 * 24 * 3600_000;
 /** last_seen is refreshed at most this often, to keep writes rare. */
 const TOUCH_MS = 3600_000;
+const TODO = new Set(['waiting', 'failed', 'forgotten']);
 
 export interface ProjectRow {
   repo: string;
@@ -61,8 +63,11 @@ export function planProjects(
       touch(r);
     }
   }
-  // Most recently active first, so the projects you are working on get the colors.
-  const order = [...active].sort((a, b) => lastActivity(sessions, b) - lastActivity(sessions, a));
+  // Projects with something to do first, then the most recently active, so the colors go where you look.
+  const todo = new Set(sessions.filter((s) => s.repo && TODO.has(s.state)).map((s) => s.repo!));
+  const order = [...active].sort(
+    (a, b) => Number(todo.has(b)) - Number(todo.has(a)) || lastActivity(sessions, b) - lastActivity(sessions, a),
+  );
   for (const repo of order) {
     const r = rows.get(repo)!;
     if (now - r.last_seen > TOUCH_MS) {

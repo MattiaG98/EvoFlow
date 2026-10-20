@@ -74,6 +74,19 @@
   --mark-review: #007aff;
   --mark-working: #34c759;
   --mark-done: #8e8e93;
+  /* De-emphasis gray for the "other days" columns. */
+  --mark-muted: #aeaeb2;
+
+  /* Topic (project) colors: validated as distinguishable in every pair and away from the state hues.
+     Teal vs raspberry is in the CVD warn band, legal only because the name is always written on the band. */
+  --topic-0: #99095c;
+  --topic-1: #005c87;
+  --topic-2: #e16fd9;
+  --topic-none: #8e8e93;
+  --topic-0-bg: rgb(153 9 92 / 0.14);
+  --topic-1-bg: rgb(0 92 135 / 0.14);
+  --topic-2-bg: rgb(225 111 217 / 0.18);
+  --topic-none-bg: rgb(142 142 147 / 0.16);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -141,6 +154,16 @@
     --mark-review: #0a84ff;
     --mark-working: #23a345;
     --mark-done: #636366;
+    --mark-muted: #636366;
+
+    --topic-0: #b55d92;
+    --topic-1: #31a4bb;
+    --topic-2: #950aae;
+    --topic-none: #636366;
+    --topic-0-bg: rgb(181 93 146 / 0.26);
+    --topic-1-bg: rgb(49 164 187 / 0.26);
+    --topic-2-bg: rgb(149 10 174 / 0.30);
+    --topic-none-bg: rgb(99 99 102 / 0.26);
   }
 }
 
@@ -195,6 +218,50 @@ code { font-size: 0.88em; }
 .mark-review { --mark: var(--mark-review); }
 .mark-working { --mark: var(--mark-working); }
 .mark-done { --mark: var(--mark-done); }
+
+.topic-0 { --topic: var(--topic-0); --topic-bg: var(--topic-0-bg); }
+.topic-1 { --topic: var(--topic-1); --topic-bg: var(--topic-1-bg); }
+.topic-2 { --topic: var(--topic-2); --topic-bg: var(--topic-2-bg); }
+.topic-none { --topic: var(--topic-none); --topic-bg: var(--topic-none-bg); }
+.swatch { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 2.5px; background: var(--topic); }
+
+/* ---------- topic band: which project a session belongs to ---------- */
+
+/* A tinted strip with a 3px top edge in the project color. The name is written in text tokens; the swatch
+   carries the identity. Quieter than the state signals by design. */
+.band {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 26px;
+  padding: 0 16px;
+  border-top: 3px solid var(--topic);
+  background: var(--topic-bg);
+}
+.band-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  height: 23px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.band-btn::after { content: ""; position: absolute; inset: -8px -8px -13px; } /* 44px touch area */
+.band-name { font-weight: 600; white-space: nowrap; }
+.band-owner { min-width: 0; overflow: hidden; color: var(--ink-2); text-overflow: ellipsis; white-space: nowrap; }
+.band-btn[aria-pressed="true"] .band-name { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.project-chip { display: inline-flex; flex: none; align-items: center; gap: 5px; max-width: 40%; color: var(--ink-2); font-size: 12px; }
+.project-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- status light ---------- */
 
@@ -400,6 +467,7 @@ main { display: block; }
 .bar-seg.is-first.is-last::before { border-radius: 4px; }
 .bar-seg.is-dimmed::before { opacity: 0.3; }
 .bar-total { flex: none; color: var(--ink-3); font-size: 13px; }
+.filter-hint { margin-top: 14px; color: var(--ink-3); font-size: 12px; }
 
 .tip {
   position: fixed;
@@ -420,6 +488,7 @@ main { display: block; }
 
 .focus { margin-top: 16px; }
 .focus-card { padding: 14px 16px 6px; border-radius: 16px; background: var(--surface); }
+.focus-card > .band { margin: -14px -16px 12px; border-radius: 16px 16px 0 0; }
 .focus-eyebrow { display: flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: 12px; line-height: 16px; letter-spacing: 0.05em; text-transform: uppercase; }
 .focus-now { color: var(--ink); font-weight: 700; }
 .focus-state { color: var(--tone-ink); font-weight: 600; }
@@ -515,7 +584,9 @@ main { display: block; }
 }
 .lane-label::after { content: ""; position: absolute; inset: -8px 0 -14px; }
 .lane-label .light { width: 8px; height: 8px; }
-.lane-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-project { flex: none; max-width: 40%; overflow: hidden; color: var(--ink-2); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.lane-label .swatch { width: 8px; height: 8px; margin-left: -2px; }
 .lane.is-done .lane-label { color: var(--ink-3); }
 .lane-track { position: relative; height: 10px; margin-top: 3px; }
 .tl-seg { position: absolute; top: 0; bottom: 0; min-width: 3px; background: var(--mark); background-clip: padding-box; }
@@ -526,6 +597,80 @@ main { display: block; }
 .lane.is-done .tl-seg { opacity: 0.45; }
 
 /* ---------- filter note above the lists ---------- */
+
+/* ---------- Andamento: per project, last 7 days ---------- */
+
+.trends { margin-top: 24px; }
+.trends-label { padding: 0 16px 7px; }
+.chart-card { padding: 14px 16px; border-radius: 12px; background: var(--surface); }
+.chart-card + .chart-card { margin-top: 12px; }
+.chart-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: 10px; }
+.chart-head > div { flex: 1 1 14rem; min-width: 0; }
+.chart-title { font-size: 17px; line-height: 22px; font-weight: 600; }
+.chart-sub { margin-top: 2px; color: var(--ink-3); font-size: 13px; line-height: 18px; }
+.chart-stat { margin-left: auto; color: var(--ink-2); font-size: 12px; text-align: right; }
+.chart-empty { color: var(--ink-3); font-size: 15px; }
+.chart-toggle { margin: 6px -8px -10px; font-size: 15px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 10px 0 0; padding: 0; color: var(--ink-2); font-size: 12px; list-style: none; }
+.chart-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; background: var(--mark); }
+
+/* One stacked bar per project on a shared scale; the value sits at the bar's tip. A row is a filter toggle. */
+.pc-rows { margin: 0; padding: 0; list-style: none; }
+.pc-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pc-row.is-folded { cursor: default; }
+.pc-row[aria-pressed="true"] .pc-name { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.pc-label { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13px; font-weight: 600; }
+.pc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-track { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* The value reserves 6.75rem so the longest row's bar plus its label fill the track. */
+.pc-bar { display: flex; flex: none; gap: 2px; width: calc((100% - 6.75rem) * var(--r)); min-width: 6px; height: 28px; }
+.pc-seg { display: flex; flex: 1 1 0; align-items: center; min-width: 4px; }
+.pc-seg::before { content: ""; width: 100%; height: 12px; background: var(--mark); }
+/* Rounded data-end, square at the baseline. */
+.pc-seg.is-end::before { border-radius: 0 4px 4px 0; }
+.pc-value { flex: none; color: var(--ink-2); font-size: 12px; white-space: nowrap; }
+@media (hover: hover) {
+  .pc-row:not(.is-folded):hover { background: var(--hover); }
+}
+
+/* Columns of waiting time per day: today in the waiting mark color, other days de-emphasized. */
+.wk-plot { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); height: 132px; margin-top: 18px; }
+.wk-yaxis { position: relative; color: var(--ink-3); font-size: 11px; }
+.wk-tick { position: absolute; right: 8px; line-height: 12px; white-space: nowrap; transform: translateY(50%); }
+.wk-area { position: relative; }
+.wk-grid { position: absolute; right: 0; left: 0; border-top: 1px solid var(--line); }
+.wk-grid.is-base { border-top-color: var(--line-strong); }
+.wk-cols { position: absolute; inset: 0; display: flex; }
+.wk-col { position: relative; display: flex; flex: 1 1 0; align-items: flex-end; justify-content: center; }
+.wk-bar { width: min(24px, 60%); border-radius: 4px 4px 0 0; background: var(--mark-muted); }
+.wk-col.is-today .wk-bar { background: var(--mark-waiting); }
+.wk-value { position: absolute; right: -8px; left: -8px; color: var(--ink); font-size: 11px; line-height: 13px; text-align: center; white-space: nowrap; }
+.wk-xaxis { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); margin-top: 6px; color: var(--ink-3); font-size: 11px; line-height: 13px; }
+.wk-days { display: flex; }
+.wk-day { display: flex; flex: 1 1 0; flex-direction: column; align-items: center; }
+.wk-day.is-today { color: var(--ink); font-weight: 700; }
+.wk-table { width: 100%; margin-top: 14px; border-collapse: collapse; font-size: 13px; }
+.wk-table th, .wk-table td { padding: 7px 4px; border-top: 0.5px solid var(--line); text-align: right; font-weight: 400; }
+.wk-table th[scope="row"], .wk-table thead th:first-child { text-align: left; }
+.wk-table thead th { border-top: 0; color: var(--ink-3); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.wk-table tr.is-today > * { font-weight: 600; }
+
+.board-empty { margin-top: 16px; padding: 16px; border-radius: 12px; background: var(--surface); color: var(--ink-2); font-size: 15px; }
 
 .filter-note { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; padding: 0 4px 0 16px; color: var(--ink-2); font-size: 15px; }
 .filter-note + .board .group:first-child { margin-top: 8px; }
@@ -574,7 +719,7 @@ main { display: block; }
 .card:first-child { border-top-left-radius: 12px; border-top-right-radius: 12px; }
 .card:last-child { border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
 /* Hairline separator, inset to start after the status light like an iOS list. */
-.card + .card::before, .more-note::before {
+.more-note::before {
   content: "";
   position: absolute;
   top: 0;
@@ -584,6 +729,8 @@ main { display: block; }
 }
 .more-note { position: relative; }
 .more-note::before { left: 16px; }
+.card > .band { grid-column: 1 / -1; margin: -11px -16px 13px; }
+.cards > .card:first-child > .band { border-radius: 12px 12px 0 0; }
 .card > .light { margin-top: 6px; }
 .row-main { min-width: 0; }
 
@@ -844,7 +991,7 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); background: var(--backdrop, rgb
   .hero { padding-top: 6px; }
   /* Home: hero, legend, bar and the focus card on the left; the timeline on the right. */
   .home { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 24px; align-items: start; margin-top: 18px; }
-  .home > .timeline { margin-top: 0; }
+  .home-side > .timeline { margin-top: 0; }
   .board.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 24px; align-items: start; }
   /* One column only (filtered, or nothing in one half): let the groups flow side by side. */
   .board:not(.split) .col { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 24px; align-items: start; }
@@ -856,8 +1003,10 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); background: var(--backdrop, rgb
 
 @media (min-width: 1100px) {
   .home { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 0 32px; }
-  /* Wide timeline: titles in a left column (~30%), lanes on the right. */
-  .tl { --tl-label: 30%; --tl-gap: 12px; }
+  /* Wide timeline: titles in a left column, lanes on the right. */
+  .tl { --tl-label: 38%; --tl-gap: 12px; }
+  /* Per project: label left, bar right. */
+  .pc-row { display: grid; grid-template-columns: minmax(0, 8rem) minmax(0, 1fr); align-items: center; column-gap: 12px; padding: 2px 0; }
   .lane { display: grid; grid-template-columns: var(--tl-label) minmax(0, 1fr); column-gap: var(--tl-gap); align-items: center; padding: 5px 0; }
   .lane-track { margin-top: 0; }
   .lane-label::after { inset: -8px 0; }
@@ -873,7 +1022,8 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); background: var(--backdrop, rgb
 }
 
 @media (forced-colors: active) {
-  .light, .ctx-fill, .meter-fill, .bar-seg::before, .tl-seg { background: CanvasText; forced-color-adjust: none; }
+  .light, .ctx-fill, .meter-fill, .bar-seg::before, .tl-seg, .swatch, .pc-seg::before, .wk-bar, .legend-dot { background: CanvasText; forced-color-adjust: none; }
+  .band { border-top-color: CanvasText; }
   .tile[aria-pressed="true"] { outline: 3px solid Highlight; }
   .cards, .tile, .field-row, .focus-card, .timeline-body { border: 1px solid CanvasText; }
 }

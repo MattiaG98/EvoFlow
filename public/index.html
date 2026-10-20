@@ -79,17 +79,45 @@
               <div id="bar" class="bar" role="img"></div>
               <span id="bar-total" class="bar-total mono"></span>
             </div>
+            <!-- The hero, bar and focus card always count everything; filters only narrow the lists. -->
+            <p id="filter-hint" class="filter-hint mono" hidden></p>
           </section>
           <section id="focus" class="focus" aria-label="Adesso: la cosa più urgente" hidden></section>
         </div>
 
-        <section id="timeline" class="timeline" aria-labelledby="timeline-title">
-          <div class="timeline-head">
-            <h2 id="timeline-title" class="section-label">Ultime 12 ore</h2>
-            <p id="timeline-stat" class="timeline-stat mono"></p>
-          </div>
-          <div id="timeline-body" class="timeline-body"></div>
-        </section>
+        <div class="home-side">
+          <section id="timeline" class="timeline" aria-labelledby="timeline-title">
+            <div class="timeline-head">
+              <h2 id="timeline-title" class="section-label">Ultime 12 ore</h2>
+              <p id="timeline-stat" class="timeline-stat mono"></p>
+            </div>
+            <div id="timeline-body" class="timeline-body"></div>
+          </section>
+
+          <section id="trends" class="trends" aria-labelledby="trends-title">
+            <h2 id="trends-title" class="section-label trends-label">Andamento</h2>
+            <div class="chart-card">
+              <div class="chart-head">
+                <div>
+                  <h3 class="chart-title">Per progetto</h3>
+                  <p class="chart-sub">Sessioni attive, prima i progetti con più cose da fare</p>
+                </div>
+              </div>
+              <div id="projects-body"></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-head">
+                <div>
+                  <h3 class="chart-title">Ultimi 7 giorni</h3>
+                  <p class="chart-sub">Tempo in cui gli agenti ti hanno aspettato</p>
+                </div>
+                <p id="week-stat" class="chart-stat mono"></p>
+              </div>
+              <div id="week-body"></div>
+              <button id="week-table-btn" type="button" class="text-btn chart-toggle" aria-expanded="false" aria-controls="week-table" hidden>Tabella</button>
+            </div>
+          </section>
+        </div>
       </div>
 
       <section id="empty" class="empty" aria-labelledby="empty-title" hidden>
@@ -102,6 +130,8 @@
         <span id="filter-label"></span>
         <button id="clear-filter" type="button" class="text-btn">Mostra tutte</button>
       </div>
+
+      <p id="board-empty" class="board-empty" hidden>Nessuna sessione con questo filtro.</p>
 
       <div id="board" class="board" hidden>
         <div id="col-attention" class="col"></div>

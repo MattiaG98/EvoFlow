@@ -55,3 +55,9 @@ export function icon(name, extraClass = '') {
   span.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PATHS[name] ?? ''}</svg>`;
   return span;
 }
+
+/** The status light: decorative, the text next to it carries the state. */
+export const light = (state, extra = '') => h('span', { class: `light light-${state}${extra}`, 'aria-hidden': 'true' });
+
+/** The project swatch: a small solid square in the topic color, beside the project's written name. */
+export const swatch = (slot) => h('span', { class: `swatch topic-${slot ?? 'none'}`, 'aria-hidden': 'true' });

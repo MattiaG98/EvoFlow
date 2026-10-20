@@ -1,11 +1,13 @@
 // EvoFlow dashboard: login, polling, the home (what to do now), the lists, actions, diary.
 
 import * as api from './api.js';
-import { buildCard, buildFocus, light, refreshTimes, timelineView } from './cards.js';
-import { h, icon } from './dom.js';
+import { buildCard, buildFocus, refreshTimes } from './cards.js';
+import { projectChart, projectRows, timelineView, weekChart, weekStat } from './charts.js';
+import { h, icon, light } from './dom.js';
 import {
   ATTENTION,
   BAR_ORDER,
+  NO_REPO_NAME,
   STATES,
   STATE_ORDER,
   calmSummary,
@@ -14,6 +16,7 @@ import {
   duration,
   durationLong,
   freshnessText,
+  projectNames,
   todoUnit,
   workingPhrase,
 } from './format.js';
@@ -24,6 +27,8 @@ const STALE_MS = 20_000;
 const TIMELINE_HOURS = 12;
 /** The timeline is refetched this often, and at once whenever a session changes state. */
 const TIMELINE_MS = 30_000;
+/** Daily stats change slowly: every 5 minutes, and whenever the page comes back into view. */
+const STATS_MS = 5 * 60_000;
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -55,7 +60,13 @@ const ui = {
   timelineBody: $('timeline-body'),
   filterNote: $('filter-note'),
   filterLabel: $('filter-label'),
+  filterHint: $('filter-hint'),
   clearFilter: $('clear-filter'),
+  boardEmpty: $('board-empty'),
+  projectsBody: $('projects-body'),
+  weekStat: $('week-stat'),
+  weekBody: $('week-body'),
+  weekTableBtn: $('week-table-btn'),
   tip: $('tip'),
   empty: $('empty'),
   board: $('board'),
@@ -95,6 +106,14 @@ const state = {
   timeline: null,
   timelineAt: 0,
   statesSig: '',
+  /** Project filter for the lists: a repo, '' for sessions without one, null when off. ANDed with `filter`. */
+  project: null,
+  /** Display names of every known repo (short, or owner/repo when two share a short name). */
+  names: new Map(),
+  /** Last StatsResponse and when it arrived; the 7-day table toggle. */
+  stats: null,
+  statsAt: 0,
+  showWeekTable: false,
 };
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -160,7 +179,10 @@ for (const st of BAR_ORDER) {
   segments[st] = seg;
   ui.bar.append(seg);
 }
-ui.clearFilter.addEventListener('click', () => setFilter(null));
+ui.clearFilter.addEventListener('click', () => {
+  state.project = null;
+  setFilter(null);
+});
 ui.lostBtn.append(icon('compass'), h('span', {}, 'Mi sono perso'));
 
 /** Filters the lists; `reveal` scrolls the filtered list into view when it is off screen. */
@@ -172,6 +194,43 @@ function setFilter(st, { reveal = false } = {}) {
   const target = sections[st].section;
   if (target.getBoundingClientRect().top > window.innerHeight * 0.75) {
     target.scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' });
+  }
+}
+
+// ---------- projects (topics) ----------
+
+/** The project a repo belongs to: the server's stable color slot, a display name, and its filter key. */
+function topicOf(repo) {
+  if (!repo) return { key: '', slot: null, name: NO_REPO_NAME, owner: '' };
+  const n = state.names.get(repo) ?? projectNames([repo]).get(repo);
+  return { key: repo, slot: state.data?.projects?.[repo] ?? null, name: n.name, owner: n.owner };
+}
+
+function updateNames() {
+  const repos = new Set(Object.keys(state.data?.projects ?? {}));
+  for (const s of state.data?.sessions ?? []) if (s.repo) repos.add(s.repo);
+  for (const l of state.timeline?.lanes ?? []) if (l.repo) repos.add(l.repo);
+  state.names = projectNames([...repos]);
+}
+
+const matchesProject = (s) => state.project == null || (s.repo ?? '') === state.project;
+
+/** Toggles the project filter of the lists; the hero, bar and focus card keep counting everything. */
+function setProject(key, { reveal = false } = {}) {
+  state.project = state.project === key ? null : key;
+  renderSummary();
+  renderBoard();
+  syncProjectToggles();
+  if (state.project == null || !reveal) return;
+  const first = STATE_ORDER.map((st) => sections[st].section).find((el) => !el.hidden);
+  if (first && first.getBoundingClientRect().top > window.innerHeight * 0.75) {
+    first.scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' });
+  }
+}
+
+function syncProjectToggles() {
+  for (const el of document.querySelectorAll('[data-action="project"]')) {
+    el.setAttribute('aria-pressed', String(state.project != null && el.dataset.repo === state.project));
   }
 }
 
@@ -188,9 +247,13 @@ function render() {
   ui.empty.hidden = !empty;
   ui.home.hidden = ui.board.hidden = empty;
   if (state.filter && !d.counts[state.filter]) state.filter = null;
+  if (state.project != null && !d.sessions.some((s) => (s.repo ?? '') === state.project)) state.project = null;
+  updateNames();
   renderSummary();
   renderFocus();
   renderBoard();
+  renderProjects();
+  syncProjectToggles();
   updateTitle();
   updateFreshness();
 }
@@ -273,8 +336,13 @@ function renderSummary() {
   );
   setText(ui.barTotal, `${total} ${total === 1 ? 'attiva' : 'attive'}`);
 
-  ui.filterNote.hidden = !state.filter;
-  setText(ui.filterLabel, state.filter ? `Solo: ${STATES[state.filter].heading}` : '');
+  const parts = [];
+  if (state.project != null) parts.push(topicOf(state.project || null).name);
+  if (state.filter) parts.push(STATES[state.filter].heading);
+  ui.filterNote.hidden = !parts.length;
+  setText(ui.filterLabel, parts.length ? `Solo: ${parts.join(' · ')}` : '');
+  ui.filterHint.hidden = !parts.length;
+  setText(ui.filterHint, parts.length ? `Filtro attivo sotto · ${parts.join(' · ')}` : '');
 
   const n = todoCount(counts);
   const attention = STATE_ORDER.filter((st) => ATTENTION.has(st) && counts[st] > 0);
@@ -300,12 +368,13 @@ function renderFocus() {
   state.focusKey = s.key;
   const next = [1, 2].map((k) => queue[(i + k) % queue.length]).filter((n, j, all) => n.key !== s.key && all.indexOf(n) === j);
   ui.focus.hidden = false;
-  const sig = JSON.stringify([s, next.map((n) => [n.key, n.state, n.title, n.since]), i, queue.length]);
+  const sig = JSON.stringify([s, topicOf(s.repo), next.map((n) => [n.key, n.state, n.title, n.since, topicOf(n.repo)]), i, queue.length]);
   if (sig === focusSig) return;
   focusSig = sig;
   const action = ui.focus.contains(document.activeElement) ? document.activeElement.dataset.action : null;
-  ui.focus.replaceChildren(buildFocus(s, { now: serverNow(), forgottenMs: state.data.config.forgottenMs, position: i + 1, total: queue.length, next }));
+  ui.focus.replaceChildren(buildFocus(s, { now: serverNow(), forgottenMs: state.data.config.forgottenMs, position: i + 1, total: queue.length, next, topicOf }));
   if (action) ui.focus.querySelector(`[data-action="${action}"]`)?.focus({ preventScroll: true });
+  syncProjectToggles();
 }
 
 ui.focus.addEventListener('click', (e) => {
@@ -323,6 +392,8 @@ ui.focus.addEventListener('click', (e) => {
     dismiss(key);
   } else if (el.dataset.action === 'goto') {
     gotoSession(el.dataset.key);
+  } else if (el.dataset.action === 'project') {
+    setProject(el.dataset.repo, { reveal: true });
   }
 });
 
@@ -352,8 +423,9 @@ function renderTimeline() {
   if (!t) return;
   setText(ui.timelineStat, t.waiting_ms >= 60_000 ? `ti hanno aspettato ${durationLong(t.waiting_ms)}` : 'nessuna attesa');
   const focused = ui.timelineBody.contains(document.activeElement) ? document.activeElement.dataset.key : null;
+  updateNames();
   ui.timelineBody.replaceChildren(
-    t.lanes.length ? timelineView(t) : h('p', { class: 'timeline-empty' }, 'La cronologia appare quando arrivano gli eventi degli hook.'),
+    t.lanes.length ? timelineView(t, topicOf) : h('p', { class: 'timeline-empty' }, 'La cronologia appare quando arrivano gli eventi degli hook.'),
   );
   if (focused) ui.timelineBody.querySelector(`[data-key="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
 }
@@ -363,6 +435,69 @@ ui.timelineBody.addEventListener('click', (e) => {
   if (lane) return gotoSession(lane.dataset.key);
   const seg = e.target.closest('[data-tip]');
   if (seg && e.pointerType !== 'mouse') flashTip(seg);
+});
+
+// ---------- charts: per project, last 7 days ----------
+
+let projectsSig = '';
+
+function renderProjects() {
+  const rows = projectRows(state.data.sessions, topicOf);
+  const sig = JSON.stringify(rows.map((r) => [r.topic, r.counts, r.todo]));
+  if (sig === projectsSig) return;
+  projectsSig = sig;
+  ui.projectsBody.replaceChildren(projectChart(rows, { active: state.project }));
+}
+
+ui.projectsBody.addEventListener('click', (e) => {
+  const row = e.target.closest('[data-action="project"]');
+  const seg = e.target.closest('[data-tip]');
+  if (seg && e.pointerType !== 'mouse') flashTip(seg);
+  if (row) setProject(row.dataset.repo, { reveal: true });
+});
+
+let statsInflight = false;
+let weekSig = '';
+
+async function refreshStats() {
+  if (!state.authed || statsInflight) return;
+  statsInflight = true;
+  try {
+    const stats = await api.getStats(7);
+    if (!state.authed) return;
+    state.stats = stats;
+    state.statsAt = Date.now();
+    renderStats();
+  } catch (err) {
+    if (err instanceof api.AuthError) showLogin();
+    // Otherwise keep the last chart: no skeleton flash.
+  } finally {
+    statsInflight = false;
+  }
+}
+
+function renderStats() {
+  const days = state.stats?.days;
+  if (!days?.length) return;
+  setText(ui.weekStat, weekStat(days));
+  ui.weekTableBtn.hidden = false;
+  const sig = JSON.stringify(days);
+  if (sig === weekSig) return;
+  weekSig = sig;
+  ui.weekBody.replaceChildren(weekChart(days, { showTable: state.showWeekTable, tableId: 'week-table' }));
+}
+
+ui.weekTableBtn.addEventListener('click', () => {
+  state.showWeekTable = !state.showWeekTable;
+  const table = document.getElementById('week-table');
+  if (table) table.hidden = !state.showWeekTable;
+  ui.weekTableBtn.setAttribute('aria-expanded', String(state.showWeekTable));
+  setText(ui.weekTableBtn, state.showWeekTable ? 'Nascondi tabella' : 'Tabella');
+});
+
+ui.weekBody.addEventListener('click', (e) => {
+  const col = e.target.closest('[data-tip]');
+  if (col && e.pointerType !== 'mouse') flashTip(col);
 });
 
 /** From the focus card or a timeline lane to the session's row: shown, expanded, scrolled to, focused. */
@@ -421,10 +556,11 @@ const cardCache = new Map();
 
 function cardFor(s, now) {
   const pending = state.pending.has(s.key);
-  const sig = JSON.stringify(s) + (pending ? '|pending' : '');
+  const topic = topicOf(s.repo);
+  const sig = JSON.stringify(s) + JSON.stringify(topic) + (pending ? '|pending' : '');
   const hit = cardCache.get(s.key);
   if (hit?.sig === sig) return hit.el;
-  const el = buildCard(s, { now, expanded: state.expanded.has(s.key), pending, forgottenMs: state.data.config.forgottenMs });
+  const el = buildCard(s, { now, expanded: state.expanded.has(s.key), pending, forgottenMs: state.data.config.forgottenMs, topic });
   cardCache.set(s.key, { sig, el });
   return el;
 }
@@ -434,12 +570,13 @@ function renderBoard() {
   const now = serverNow();
   const focus = rememberFocus();
   const byState = Object.fromEntries(STATE_ORDER.map((st) => [st, []]));
-  for (const s of d.sessions) byState[s.state]?.push(s);
+  for (const s of d.sessions) if (matchesProject(s)) byState[s.state]?.push(s);
 
   const seen = new Set();
   for (const st of STATE_ORDER) {
     const { section, list, count, toggle } = sections[st];
-    const total = Math.max(d.counts[st] ?? 0, byState[st].length);
+    // With a project filter the counts are the listed sessions; otherwise the server's (done is capped at 50).
+    const total = state.project == null ? Math.max(d.counts[st] ?? 0, byState[st].length) : byState[st].length;
     section.hidden = total === 0 || (state.filter != null && state.filter !== st);
     count.textContent = String(total);
     const open = st !== 'done' || state.doneOpen || state.filter === 'done';
@@ -466,6 +603,7 @@ function renderBoard() {
   ui.colRest.hidden = !restShown;
   // Two columns on wide screens ("needs you" | "everything else") only when both have something.
   ui.board.classList.toggle('split', attentionShown && restShown);
+  ui.boardEmpty.hidden = attentionShown || restShown;
   restoreFocus(focus);
 }
 
@@ -561,6 +699,7 @@ function apply(data) {
     state.statesSig = statesSig;
     refreshTimeline();
   }
+  if (Date.now() - state.statsAt > STATS_MS) refreshStats();
 }
 
 async function refresh() {
@@ -600,8 +739,10 @@ function schedule() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') refresh();
-  else clearTimeout(timer);
+  if (document.visibilityState === 'visible') {
+    state.statsAt = 0; // daily stats are refreshed whenever the page comes back into view
+    refresh();
+  } else clearTimeout(timer);
 });
 window.addEventListener('focus', () => {
   if (Date.now() - state.receivedAt > 1_000) refresh();
@@ -615,7 +756,9 @@ ui.board.addEventListener('click', (e) => {
   const card = e.target.closest('.card');
   if (!card) return;
   const key = card.dataset.key;
-  const action = e.target.closest('[data-action]')?.dataset.action;
+  const actionEl = e.target.closest('[data-action]');
+  const action = actionEl?.dataset.action;
+  if (action === 'project') return setProject(actionEl.dataset.repo);
   if (action === 'toggle') return setExpanded(card, key, !state.expanded.has(key));
   if (action === 'dismiss') return dismiss(key);
   if (action === 'restore') return restore(key);
@@ -784,7 +927,16 @@ function showLogin() {
   state.timeline = null;
   state.timelineAt = 0;
   state.statesSig = '';
+  state.project = null;
+  state.stats = null;
+  state.statsAt = 0;
   focusSig = '';
+  projectsSig = '';
+  weekSig = '';
+  ui.projectsBody.replaceChildren();
+  ui.weekBody.replaceChildren();
+  setText(ui.weekStat, '');
+  ui.weekTableBtn.hidden = true;
   cardCache.clear();
   for (const { list } of Object.values(sections)) list.replaceChildren();
   ui.focus.replaceChildren();

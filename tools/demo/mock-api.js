@@ -3,6 +3,8 @@
 // Same exports as public/api.js; tools/build-demo.ts swaps it in.
 import { applyEvent, applySnapshot, sessionKey } from '../../src/core/ingest.ts';
 import { countByState, deriveSession, sortSessions } from '../../src/core/state.ts';
+import { planProjects } from '../../src/core/projects.ts';
+import { dailyStats } from '../../src/core/stats.ts';
 import { buildTimeline } from '../../src/core/timeline.ts';
 import { DEFAULT_CONFIG } from '../../src/core/types.ts';
 import scenario from '../../tests/fixtures/scenario-demo.json';
@@ -49,13 +51,52 @@ const HISTORY = [
   [B, 455, 'PostToolUse', { tool_name: 'Bash', tool_input: { description: 'Run migrations' } }],
   [C, 420, 'Stop', { last_assistant_message: 'Hero aggiornata con il nuovo payoff.' }],
   [A, 400, 'UserPromptSubmit'],
-  [B, 380, 'Stop', { last_assistant_message: 'Migrazioni applicate. Procedo con il rate limiting?' }],
+  [B, 380, 'Stop', { last_assistant_message: 'Migrazioni applicate, schema aggiornato in staging.' }],
   [A, 330, 'Stop', { last_assistant_message: 'Ho mappato il flusso di checkout attuale. Vuoi che proceda con il refactor?' }],
   [D, 300, 'UserPromptSubmit'],
   [D, 240, 'Stop', { last_assistant_message: 'Quale strategia di conflitto preferisci?' }],
   [A, 210, 'UserPromptSubmit'],
   [A, 150, 'Stop', { last_assistant_message: 'Analisi completata.' }],
 ].sort((x, y) => y[1] - x[1]);
+
+// The six days before today: a few finished sessions per day, so the weekly chart has a shape.
+// Deterministic (seeded) so every viewer sees the same example week.
+function weekHistory(now) {
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const pick = (list) => list[Math.floor(rand() * list.length)];
+  const repos = ['demo/shop-app', 'demo/api-server', 'demo/landing', 'demo/mobile', 'demo/analytics'];
+  const tasks = ['Correggi il bug del carrello', 'Aggiungi i test di integrazione', 'Rivedi i testi della home', 'Ottimizza le query lente', 'Migra la configurazione', 'Scrivi il changelog', 'Aggiorna le dipendenze'];
+  const midnight = new Date(now);
+  midnight.setHours(0, 0, 0, 0);
+  const out = [];
+  for (let d = 6; d >= 1; d--) {
+    const sessions = 3 + Math.floor(rand() * 3);
+    for (let i = 0; i < sessions; i++) {
+      const s = { id: `w${d}-${i}`, meta: meta(undefined, { entrypoint: pick(['cli', 'claude-desktop']), host: 'MacBook-Pro', repo: pick(repos), branch: 'main' }) };
+      let t = midnight.getTime() - d * 24 * HOUR + (9 + rand() * 8) * HOUR;
+      const push = (event, extra) => out.push([t, ev(s, event, extra)]);
+      push('UserPromptSubmit', { prompt: pick(tasks) });
+      t += (20 + rand() * 60) * MIN;
+      // Earlier days wait longer: the example week shows waits getting shorter.
+      const wait = (8 + rand() * 25 + d * 9) * MIN;
+      if (rand() < 0.6) {
+        push('Notification', { message: 'Claude needs your permission to use Bash' });
+        t += wait;
+        push('PostToolUse', { tool_name: 'Bash' });
+        t += (10 + rand() * 40) * MIN;
+      }
+      push('Stop', { last_assistant_message: 'Vuoi che apra la PR?' });
+      t += wait * (0.3 + rand() * 0.5);
+      push('UserPromptSubmit', { prompt: 'Sì, procedi' });
+      t += (5 + rand() * 20) * MIN;
+      push('Stop', { last_assistant_message: 'PR aperta, test verdi.' });
+      t += 10 * MIN;
+      push('SessionEnd', { reason: 'prompt_input_exit' });
+    }
+  }
+  return out.sort((a, b) => a[0] - b[0]);
+}
 
 // What happens after the page opens, in seconds.
 const TIMELINE = [
@@ -72,6 +113,7 @@ const TIMELINE = [
 
 let rows;
 let logs;
+let projects;
 let diary;
 let loggedIn;
 let timers = [];
@@ -91,9 +133,11 @@ export function resetDemo() {
   timers.forEach(clearTimeout);
   rows = new Map();
   logs = [];
+  projects = [];
   diary = [];
   loggedIn = true;
   const now = Date.now();
+  for (const [at, envelope] of weekHistory(now)) ingest(envelope, at);
   for (const [s, minutesAgo, event, extra] of HISTORY) ingest(ev(s, event, extra), now - minutesAgo * MIN);
   const step = new Map();
   for (const s of scenario.steps) {
@@ -131,11 +175,14 @@ function sessionsResponse() {
   const now = Date.now();
   const derived = sortSessions([...rows.values()].map((r) => deriveSession(r, now, DEFAULT_CONFIG)));
   let done = 0;
+  const plan = planProjects(projects, derived, now);
+  for (const c of plan.changed) projects = [...projects.filter((p) => p.repo !== c.repo), c];
   return {
     now,
     config: DEFAULT_CONFIG,
     counts: countByState(derived),
     sessions: derived.filter((s) => s.state !== 'done' || ++done <= 50),
+    projects: plan.slots,
   };
 }
 
@@ -167,6 +214,13 @@ export async function getTimeline(hours = 12) {
   const now = Date.now();
   const derived = [...rows.values()].map((r) => deriveSession(r, now, DEFAULT_CONFIG));
   return delay(buildTimeline(logs, derived, now - hours * HOUR, now, DEFAULT_CONFIG));
+}
+
+export async function getStats(days = 7, tz = new Date().getTimezoneOffset()) {
+  guard();
+  const now = Date.now();
+  const derived = [...rows.values()].map((r) => deriveSession(r, now, DEFAULT_CONFIG));
+  return delay(dailyStats(logs, derived, now, days, tz, DEFAULT_CONFIG));
 }
 
 export const getDiary = async () => (guard(), delay({ entries: [...diary].reverse() }));

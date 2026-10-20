@@ -1,4 +1,5 @@
 import type { LogEntry } from '../core/ingest.ts';
+import type { ProjectRow } from '../core/projects.ts';
 import type { DiaryEntry, SessionRow } from '../core/types.ts';
 import type { D1Database } from './env.ts';
 
@@ -21,6 +22,9 @@ const SCHEMA = [
     key TEXT NOT NULL, at INTEGER NOT NULL, event TEXT NOT NULL, summary TEXT
   )`,
   `CREATE INDEX IF NOT EXISTS events_at ON events (at)`,
+  `CREATE TABLE IF NOT EXISTS projects (
+    repo TEXT PRIMARY KEY, slot INTEGER, last_seen INTEGER NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS diary (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at INTEGER NOT NULL, note TEXT NOT NULL, context TEXT
@@ -88,6 +92,15 @@ export async function listEvents(db: D1Database, since: number): Promise<LogEntr
     .bind(since)
     .all<LogEntry>();
   return results;
+}
+
+export async function listProjects(db: D1Database): Promise<ProjectRow[]> {
+  const { results } = await db.prepare('SELECT repo, slot, last_seen FROM projects').all<ProjectRow>();
+  return results;
+}
+
+export function projectStatement(db: D1Database, p: ProjectRow) {
+  return db.prepare('INSERT OR REPLACE INTO projects (repo, slot, last_seen) VALUES (?, ?, ?)').bind(p.repo, p.slot, p.last_seen);
 }
 
 export async function setDismissed(db: D1Database, key: string, at: number | null): Promise<boolean> {

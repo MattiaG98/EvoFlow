@@ -44,5 +44,6 @@ export const logout = () => request('POST', '/api/logout');
 export const dismiss = (key) => request('POST', sessionPath(key, 'dismiss'));
 export const restore = (key) => request('POST', sessionPath(key, 'restore'));
 export const getTimeline = (hours = 12) => request('GET', `/api/timeline?hours=${hours}`);
+export const getStats = (days = 7) => request('GET', `/api/stats?days=${days}&tz=${new Date().getTimezoneOffset()}`);
 export const getDiary = () => request('GET', '/api/diary');
 export const addDiary = (note) => request('POST', '/api/diary', { note });

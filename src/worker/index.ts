@@ -7,6 +7,8 @@ import {
   type SnapshotItem,
 } from '../core/ingest.ts';
 import { countByState, deriveSession, sortSessions } from '../core/state.ts';
+import { planProjects } from '../core/projects.ts';
+import { dailyStats } from '../core/stats.ts';
 import { buildTimeline } from '../core/timeline.ts';
 import { DEFAULT_CONFIG, type HookEnvelope, type SessionsResponse, type StateConfig } from '../core/types.ts';
 import {
@@ -15,8 +17,10 @@ import {
   getSession,
   listDiary,
   listEvents,
+  listProjects,
   listSessions,
   logStatement,
+  projectStatement,
   prune,
   setDismissed,
   upsertStatement,
@@ -136,6 +140,14 @@ async function route(request: Request, url: URL, env: Env): Promise<Response> {
     return json(buildTimeline(events, derived, from, now, config));
   }
 
+  if (pathname === '/api/stats' && method === 'GET') {
+    const days = Math.min(30, Math.max(1, Number(url.searchParams.get('days')) || 7));
+    const tz = Math.min(840, Math.max(-840, Number(url.searchParams.get('tz')) || 0));
+    const { config, derived } = await deriveAll(env, now);
+    const events = await listEvents(env.DB, now - (days + 1) * DAY - config.forgottenMs);
+    return json(dailyStats(events, derived, now, days, tz, config));
+  }
+
   if (pathname === '/api/diary' && method === 'GET') {
     return json({ entries: await listDiary(env.DB, 200) });
   }
@@ -161,7 +173,9 @@ async function sessionsResponse(env: Env, now: number): Promise<SessionsResponse
   const counts = countByState(derived);
   let done = 0;
   const sessions = derived.filter((s) => s.state !== 'done' || ++done <= MAX_DONE_SESSIONS);
-  return { now, config, counts, sessions };
+  const { slots, changed } = planProjects(await listProjects(env.DB), derived, now);
+  if (changed.length) await env.DB.batch(changed.map((p) => projectStatement(env.DB, p)));
+  return { now, config, counts, sessions, projects: slots };
 }
 
 function configFrom(env: Env): StateConfig {

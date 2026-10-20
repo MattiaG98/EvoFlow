@@ -155,3 +155,20 @@ test('the timeline endpoint reconstructs recent history from the event log', asy
   assert.equal(t.lanes[0].title, 'Deploy');
   assert.deepEqual(t.lanes[0].segments.map((s: any) => s.state), ['working', 'waiting']);
 });
+
+test('sessions carry stable project colors; stats cover the requested days', async () => {
+  const env = makeEnv();
+  const post = (b: unknown) => call(env, 'POST', '/api/events', { body: b, token: TOKEN });
+  await post(hook('s1', 'UserPromptSubmit', { prompt: 'a' }, { repo: 'demo/one' }));
+  await post(hook('s2', 'Notification', { message: 'permesso' }, { repo: 'demo/two' }));
+  const first = await (await call(env, 'GET', '/api/sessions', { token: PASSWORD })).json();
+  assert.deepEqual(Object.keys(first.projects).sort(), ['demo/one', 'demo/two']);
+  assert.notEqual(first.projects['demo/one'], first.projects['demo/two']);
+  const again = await (await call(env, 'GET', '/api/sessions', { token: PASSWORD })).json();
+  assert.deepEqual(again.projects, first.projects);
+
+  const stats = await (await call(env, 'GET', '/api/stats?days=7&tz=-120', { token: PASSWORD })).json();
+  assert.equal(stats.days.length, 7);
+  assert.equal(stats.days.at(-1).prompts, 1);
+  assert.equal((await call(env, 'GET', '/api/stats', { token: TOKEN })).status, 401);
+});

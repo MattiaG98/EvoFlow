@@ -93,6 +93,8 @@ export interface SessionsResponse {
   config: StateConfig;
   counts: Record<State, number>;
   sessions: DerivedSession[];
+  /** Topic color slot per repository (0-3), or null for a neutral band. Stable over time. */
+  projects: Record<string, number | null>;
 }
 
 export interface TimelineSegment {
@@ -107,7 +109,21 @@ export interface TimelineResponse {
   to: number;
   /** Total time, across sessions, spent waiting on you inside the window (waiting + forgotten). */
   waiting_ms: number;
-  lanes: { key: string; title: string; state: State; segments: TimelineSegment[] }[];
+  lanes: { key: string; title: string; repo: string | null; state: State; segments: TimelineSegment[] }[];
+}
+
+/** GET /api/stats: one entry per local calendar day, oldest first, today last. */
+export interface StatsResponse {
+  days: {
+    /** Local midnight, epoch ms. */
+    start: number;
+    /** Time agents spent waiting on you that day (waiting + forgotten), across sessions. */
+    waiting_ms: number;
+    /** Messages you sent to agents that day. */
+    prompts: number;
+    /** Sessions that worked at some point that day. */
+    sessions: number;
+  }[];
 }
 
 export interface DiaryEntry {
